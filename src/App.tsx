@@ -8,12 +8,13 @@ import { CombatLab } from './dev/CombatLab'
 import { LootLab } from './dev/LootLab'
 import { PackLab } from './dev/PackLab'
 import { SlamLab } from './dev/SlamLab'
+import { appPath } from './navigation'
 import { installFeedbackAudio } from './presentation/audio'
 
 export function App() {
   useEffect(() => installFeedbackAudio(), [])
 
-  const path = window.location.pathname
+  const path = appPath()
   if (path === '/stack') return <StackBuilder />
   if (path === '/binder') return <Binder />
   if (path === '/dev/pack') return <PackLab />

@@ -6,6 +6,7 @@ import { ENEMIES, POGS, pogById } from '../game/content'
 import { useCollectionStore } from '../game/collectionStore'
 import { isFinalEncounter } from '../game/run'
 import { useGameStore } from '../game/store'
+import { appHref, navigate } from '../navigation'
 import { emitFeedback, onFeedback } from '../presentation/events'
 import type { PackResult } from '../game/types'
 
@@ -134,11 +135,11 @@ export function GameShell() {
         </div>
 
         <div className="combat-hud-actions">
-          <a className="binder-shortcut" href="/stack">
+          <a className="binder-shortcut" href={appHref('/stack')}>
             STACK
             <strong>{activeStack.length}/8</strong>
           </a>
-          <a className="binder-shortcut" href="/binder">
+          <a className="binder-shortcut" href={appHref('/binder')}>
             BINDER
             <strong>{ownedCount}/{POGS.length}</strong>
           </a>
@@ -229,7 +230,7 @@ export function GameShell() {
             pack={completionPack}
             onDone={() => {
               setCompletionPack(null)
-              window.location.href = '/binder'
+              navigate('/binder')
             }}
           />
         )}

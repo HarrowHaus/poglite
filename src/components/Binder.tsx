@@ -1,4 +1,5 @@
 import { POGS } from '../game/content'
+import { appHref } from '../navigation'
 import { useCollectionStore } from '../game/collectionStore'
 import { PogMedallion } from './PogMedallion'
 import type { CollectionEntry, PrintTreatment } from '../game/types'
@@ -31,7 +32,7 @@ export function Binder() {
             {owned}/{POGS.length} POGs · {totalCopies} total copies · {discoveredPrints} print discoveries
           </p>
         </div>
-        <a href="/">BACK TO TABLE</a>
+        <a href={appHref('/')}>BACK TO TABLE</a>
       </header>
 
       <section className="binder-grid">
