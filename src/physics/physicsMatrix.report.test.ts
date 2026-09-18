@@ -9,13 +9,66 @@ interface Profile {
   baseTilt: number
   extraTilt: number
   spinScale: number
+  capRestitution: number
+  tableRestitution: number
+  slammerRestitution: number
 }
 
 const profiles: Profile[] = [
-  { name: 'flat-no-spin', baseTilt: 0, extraTilt: 0, spinScale: 0 },
-  { name: 'flat-spin', baseTilt: 0, extraTilt: 0, spinScale: 1 },
-  { name: 'tilt-no-spin', baseTilt: 0.13, extraTilt: 0.16, spinScale: 0 },
-  { name: 'tilt-spin', baseTilt: 0.13, extraTilt: 0.16, spinScale: 1 },
+  {
+    name: 'flat-dead',
+    baseTilt: 0,
+    extraTilt: 0,
+    spinScale: 0,
+    capRestitution: 0.03,
+    tableRestitution: 0,
+    slammerRestitution: 0.09,
+  },
+  {
+    name: 'tilt-spin-dead',
+    baseTilt: 0.13,
+    extraTilt: 0.16,
+    spinScale: 1,
+    capRestitution: 0.03,
+    tableRestitution: 0,
+    slammerRestitution: 0.09,
+  },
+  {
+    name: 'flat-rebound',
+    baseTilt: 0,
+    extraTilt: 0,
+    spinScale: 0,
+    capRestitution: 0.12,
+    tableRestitution: 0.22,
+    slammerRestitution: 0.15,
+  },
+  {
+    name: 'tilt-no-spin-rebound',
+    baseTilt: 0.13,
+    extraTilt: 0.16,
+    spinScale: 0,
+    capRestitution: 0.12,
+    tableRestitution: 0.22,
+    slammerRestitution: 0.15,
+  },
+  {
+    name: 'tilt-spin-rebound',
+    baseTilt: 0.13,
+    extraTilt: 0.16,
+    spinScale: 1,
+    capRestitution: 0.12,
+    tableRestitution: 0.22,
+    slammerRestitution: 0.15,
+  },
+  {
+    name: 'tilt-spin-lively',
+    baseTilt: 0.13,
+    extraTilt: 0.16,
+    spinScale: 1,
+    capRestitution: 0.22,
+    tableRestitution: 0.35,
+    slammerRestitution: 0.22,
+  },
 ]
 
 const powers = [0.55, 0.75, 1]
@@ -39,6 +92,17 @@ function summarize(results: HeadlessShotMetrics[]) {
     avgFlips: mean(results.map((result) => result.flips)),
     anyFlipRate:
       results.filter((result) => result.flips > 0).length / results.length,
+    avgEverFaceUpCount: mean(
+      results.map((result) => result.everFaceUpCount),
+    ),
+    anyEverFaceUpRate:
+      results.filter((result) => result.everFaceUpCount > 0).length /
+      results.length,
+    avgMaxCapRise: mean(results.map((result) => result.maxCapRise)),
+    avgMeanMaxCapRise: mean(
+      results.map((result) => result.meanMaxCapRise),
+    ),
+    avgMaxUpDot: mean(results.map((result) => result.maxUpDot)),
     avgContactEccentricity: nullableMean(
       results.map((result) => result.contactEccentricity),
     ),
@@ -91,6 +155,9 @@ reportIt(
                   baseTilt: profile.baseTilt,
                   extraTilt: profile.extraTilt,
                   spinScale: profile.spinScale,
+                  capRestitution: profile.capRestitution,
+                  tableRestitution: profile.tableRestitution,
+                  slammerRestitution: profile.slammerRestitution,
                 }),
               )
             }
