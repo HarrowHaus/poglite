@@ -11,6 +11,13 @@ export interface VerticalSlingConfig {
   minVerticalPull: number
 }
 
+export interface PredictedPoint {
+  x: number
+  y: number
+  z: number
+  t: number
+}
+
 export const DEFAULT_VERTICAL_SLING: VerticalSlingConfig = {
   maxVerticalPull: 1.55,
   lateralRatio: 0.48,
@@ -62,5 +69,60 @@ export function verticalSlamImpulse(
     x: (-pull.x / length) * magnitude,
     y: (-pull.y / length) * magnitude,
     z: (-pull.z / length) * magnitude,
+  }
+}
+
+export function predictBallisticPath(
+  start: { x: number; y: number; z: number },
+  velocity: { x: number; y: number; z: number },
+  gravityY: number,
+  floorY: number,
+  stepSeconds = 0.045,
+  maxSeconds = 0.8,
+): PredictedPoint[] {
+  const points: PredictedPoint[] = []
+
+  for (let t = 0; t <= maxSeconds; t += stepSeconds) {
+    const point = {
+      x: start.x + velocity.x * t,
+      y: start.y + velocity.y * t + 0.5 * gravityY * t * t,
+      z: start.z + velocity.z * t,
+      t,
+    }
+
+    points.push(point)
+    if (point.y <= floorY && t > 0) break
+  }
+
+  return points
+}
+
+export function predictImpactPoint(
+  start: { x: number; y: number; z: number },
+  velocity: { x: number; y: number; z: number },
+  gravityY: number,
+  impactY: number,
+): PredictedPoint | null {
+  const a = 0.5 * gravityY
+  const b = velocity.y
+  const c = start.y - impactY
+
+  const discriminant = b * b - 4 * a * c
+  if (discriminant < 0 || Math.abs(a) < 1e-9) return null
+
+  const root = Math.sqrt(discriminant)
+  const candidates = [
+    (-b - root) / (2 * a),
+    (-b + root) / (2 * a),
+  ].filter((t) => t > 0)
+
+  if (candidates.length === 0) return null
+  const t = Math.min(...candidates)
+
+  return {
+    x: start.x + velocity.x * t,
+    y: impactY,
+    z: start.z + velocity.z * t,
+    t,
   }
 }
