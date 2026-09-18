@@ -246,7 +246,7 @@ export function GameShell() {
                   ? finalEncounter ? 'FINAL ENCOUNTER CLEARED' : 'REWARD READY'
                   : battle.lost
                     ? 'RUN ENDED'
-                    : 'MOVE TO AIM · TAP TABLE TO SLAM'}
+                    : 'GRAB SLAMMER · PULL BACK · RELEASE'}
         </div>
       </section>
 
