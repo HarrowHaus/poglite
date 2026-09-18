@@ -2,8 +2,8 @@ import { useDrag } from '@use-gesture/react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import {
   CuboidCollider,
-  CylinderCollider,
   Physics,
+  RoundCylinderCollider,
   RigidBody,
   type RapierRigidBody,
 } from '@react-three/rapier'
@@ -15,6 +15,8 @@ import { rollSlammer } from '../game/loot'
 import { isFaceUpRotation } from '../game/slamPhysics'
 import {
   constrainVerticalPull,
+  predictBallisticPath,
+  predictImpactPoint,
   verticalSlamImpulse,
   type VerticalSlingPull,
 } from '../game/verticalSling'
@@ -22,16 +24,99 @@ import { appHref } from '../navigation'
 import { projectClientPointToPlane } from '../presentation/pointerProjection'
 
 const POG_RADIUS = 0.58
-const POG_THICKNESS = 0.07
-const STACK_SPACING = 0.075
+const POG_THICKNESS = 0.045
+const POG_EDGE_RADIUS = 0.006
+const POG_MASS = 0.08
+const STACK_SPACING = 0.046
+const CAP_FRICTION = 0.42
+const TABLE_FRICTION = 0.44
+const SLAMMER_FRICTION = 0.36
+const FACE_UP_THRESHOLD = 0.72
 
 const ANCHOR = { x: 0, y: 1.35, z: 0 }
 const EMPTY_PULL: VerticalSlingPull = { x: 0, y: 0, z: 0, power: 0 }
-const MIN_SETTLE_AFTER_IMPACT_MS = 260
-const MAX_RESOLVE_MS = 1100
+const MIN_SETTLE_AFTER_IMPACT_MS = 220
+const MAX_RESOLVE_MS = 980
+const STACK_TOP_Y =
+  0.04 + (STARTER_STACK.length - 1) * STACK_SPACING + POG_THICKNESS
+
+function stackOffset(index: number) {
+  return {
+    x: ((index % 3) - 1) * 0.004,
+    z: (((index * 2) % 3) - 1) * 0.004,
+  }
+}
 
 function vecLength(v: { x: number; y: number; z: number }) {
   return Math.hypot(v.x, v.y, v.z)
+}
+
+function TrajectoryPreview({
+  pull,
+  familyMass,
+  baseImpulse,
+}: {
+  pull: VerticalSlingPull
+  familyMass: number
+  baseImpulse: number
+}) {
+  const impulse = verticalSlamImpulse(pull, baseImpulse)
+  if (!impulse) return null
+
+  const start = {
+    x: ANCHOR.x + pull.x,
+    y: ANCHOR.y + pull.y,
+    z: ANCHOR.z + pull.z,
+  }
+  const velocity = {
+    x: impulse.x / familyMass,
+    y: impulse.y / familyMass,
+    z: impulse.z / familyMass,
+  }
+
+  const points = predictBallisticPath(
+    start,
+    velocity,
+    -9.81,
+    STACK_TOP_Y,
+    0.04,
+    0.7,
+  )
+  const impact = predictImpactPoint(
+    start,
+    velocity,
+    -9.81,
+    STACK_TOP_Y,
+  )
+
+  return (
+    <>
+      {points.slice(1).map((point, index) => (
+        <mesh key={index} position={[point.x, point.y, point.z]}>
+          <sphereGeometry args={[0.026, 8, 8]} />
+          <meshBasicMaterial
+            color="#f3ff72"
+            transparent
+            opacity={Math.max(0.18, 0.8 - index * 0.055)}
+          />
+        </mesh>
+      ))}
+
+      {impact && (
+        <mesh
+          position={[impact.x, STACK_TOP_Y + 0.008, impact.z]}
+          rotation={[-Math.PI / 2, 0, 0]}
+        >
+          <ringGeometry args={[0.16, 0.22, 28]} />
+          <meshBasicMaterial
+            color={pull.power > 0.82 ? '#ff765f' : '#73e2c5'}
+            transparent
+            opacity={0.82}
+          />
+        </mesh>
+      )}
+    </>
+  )
 }
 
 function VerticalSlingScene({
@@ -69,12 +154,20 @@ function VerticalSlingScene({
     for (let index = 0; index < STARTER_STACK.length; index += 1) {
       const body = pogBodies.current[index]
       if (!body) continue
-      body.setTranslation({ x: 0, y: 0.04 + index * STACK_SPACING, z: 0 }, true)
+      const offset = stackOffset(index)
+      body.setTranslation(
+        {
+          x: offset.x,
+          y: 0.04 + index * STACK_SPACING,
+          z: offset.z,
+        },
+        true,
+      )
       body.setRotation({ x: 1, y: 0, z: 0, w: 0 }, true)
       body.setLinvel({ x: 0, y: 0, z: 0 }, true)
       body.setAngvel({ x: 0, y: 0, z: 0 }, true)
-      body.setLinearDamping(0.28)
-      body.setAngularDamping(0.26)
+      body.setLinearDamping(0.05)
+      body.setAngularDamping(0.08)
     }
 
     const body = slammerBody.current
@@ -98,7 +191,7 @@ function VerticalSlingScene({
     if (releaseTime === null) return
 
     const flips = pogBodies.current.flatMap((body, index) =>
-      body && isFaceUpRotation(body.rotation(), 0.25)
+      body && isFaceUpRotation(body.rotation(), FACE_UP_THRESHOLD)
         ? [STARTER_STACK[index]]
         : [],
     )
@@ -141,11 +234,11 @@ function VerticalSlingScene({
     const now = performance.now()
     const elapsed = now - releasedAt.current
 
-    if (impactAt.current !== null && now - impactAt.current > 300) {
+    if (impactAt.current !== null && now - impactAt.current > 380) {
       for (const pog of pogBodies.current) {
         if (!pog) continue
-        pog.setLinearDamping(0.9)
-        pog.setAngularDamping(1.0)
+        pog.setLinearDamping(0.52)
+        pog.setAngularDamping(0.72)
       }
     }
 
@@ -231,11 +324,12 @@ function VerticalSlingScene({
         setPhaseBoth('flight')
 
         body.applyImpulse(impulse, true)
-        body.applyTorqueImpulse(
+        const spinDirection = nextPull.x < 0 ? -1 : 1
+        body.setAngvel(
           {
-            x: nextPull.z * 0.3,
-            y: nextPull.x * 0.16,
-            z: -nextPull.x * 0.3,
+            x: 0,
+            y: spinDirection * (3.2 + nextPull.power * 5.8),
+            z: 0,
           },
           true,
         )
@@ -257,7 +351,7 @@ function VerticalSlingScene({
         <CuboidCollider
           args={[3.75, 0.2, 3.75]}
           position={[0, -0.22, 0]}
-          friction={0.95}
+          friction={TABLE_FRICTION}
         />
         <mesh position={[0, -0.22, 0]} receiveShadow>
           <boxGeometry args={[7.5, 0.4, 7.5]} />
@@ -274,15 +368,25 @@ function VerticalSlingScene({
               pogBodies.current[index] = body
             }}
             colliders={false}
-            linearDamping={0.28}
-            angularDamping={0.26}
-            position={[0, 0.04 + index * STACK_SPACING, 0]}
-            rotation={[Math.PI, 0, index * 0.09]}
+            linearDamping={0.05}
+            angularDamping={0.08}
+            additionalSolverIterations={2}
+            position={[
+              stackOffset(index).x,
+              0.04 + index * STACK_SPACING,
+              stackOffset(index).z,
+            ]}
+            rotation={[Math.PI, 0, index * 0.11]}
           >
-            <CylinderCollider
-              args={[POG_THICKNESS / 2, POG_RADIUS]}
-              friction={0.78}
-              restitution={0.08}
+            <RoundCylinderCollider
+              args={[
+                POG_THICKNESS / 2 - POG_EDGE_RADIUS,
+                POG_RADIUS - POG_EDGE_RADIUS,
+                POG_EDGE_RADIUS,
+              ]}
+              mass={POG_MASS}
+              friction={CAP_FRICTION}
+              restitution={0.04}
             />
             <mesh castShadow receiveShadow>
               <cylinderGeometry args={[POG_RADIUS, POG_RADIUS, POG_THICKNESS, 40]} />
@@ -302,8 +406,10 @@ function VerticalSlingScene({
         ref={slammerBody}
         colliders={false}
         ccd
-        linearDamping={0.08}
-        angularDamping={0.12}
+        additionalSolverIterations={4}
+        enabledRotations={[false, true, false]}
+        linearDamping={0.04}
+        angularDamping={0.05}
         position={[ANCHOR.x, ANCHOR.y, ANCHOR.z]}
         onContactForce={(event) => {
           if (phaseRef.current !== 'flight' || impactAt.current !== null) return
@@ -312,11 +418,15 @@ function VerticalSlingScene({
           impactAt.current = performance.now()
         }}
       >
-        <CylinderCollider
-          args={[family.physics.thickness / 2, family.physics.radius]}
+        <RoundCylinderCollider
+          args={[
+            Math.max(0.01, family.physics.thickness / 2 - 0.012),
+            Math.max(0.1, family.physics.radius - 0.012),
+            0.012,
+          ]}
           mass={family.physics.mass}
-          friction={0.72}
-          restitution={0.06}
+          friction={SLAMMER_FRICTION}
+          restitution={0.05}
         />
         <group {...bind()} scale={phase === 'ready' ? 1.08 : 1}>
           <mesh castShadow>
@@ -341,6 +451,11 @@ function VerticalSlingScene({
 
       {phase === 'ready' && pull.power > 0.03 && (
         <>
+          <TrajectoryPreview
+            pull={pull}
+            familyMass={family.physics.mass}
+            baseImpulse={family.physics.slamImpulse}
+          />
           <mesh position={[ANCHOR.x, 0.02, ANCHOR.z]} rotation={[-Math.PI / 2, 0, 0]}>
             <ringGeometry args={[0.24, 0.3, 32]} />
             <meshBasicMaterial color="#f3ff72" transparent opacity={0.5} />
@@ -423,7 +538,11 @@ export function VerticalSlingLab() {
         >
           <color attach="background" args={['#11100f']} />
           <fog attach="fog" args={['#11100f', 9, 19]} />
-          <Physics gravity={[0, -9.81, 0]} timeStep={1 / 60}>
+          <Physics
+            gravity={[0, -9.81, 0]}
+            timeStep={1 / 120}
+            numSolverIterations={8}
+          >
             <VerticalSlingScene onResult={setLast} />
           </Physics>
         </Canvas>
