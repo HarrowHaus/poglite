@@ -8,7 +8,7 @@ interface GameStore {
   battle: BattleState
   slammer: GeneratedSlammer
   lastResolution?: SlamResolution
-  resolve: (flippedPogIds: string[]) => void
+  resolve: (flippedPogIds: string[]) => SlamResolution
   reset: () => void
 }
 
@@ -21,6 +21,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   resolve(flippedPogIds) {
     const result = resolveSlam(get().battle, enemy, get().slammer, flippedPogIds)
     set({ battle: result.next, lastResolution: result })
+    return result
   },
   reset() {
     set({ battle: initialBattleState(enemy), lastResolution: undefined })
