@@ -23,7 +23,7 @@ The game needs real 3D disc rotation, perspective, lighting, shader/material wor
 
 ### Rapier / @react-three/rapier — KEEP
 
-Rigid-body cylinders striking a stack are the signature mechanic. Rapier gives us real 3D rigid-body simulation, collision/contact-force events, fixed stepping, debug rendering, snapshots, and WASM performance.
+Rigid-body cylinders striking a stack are the signature mechanic. Rapier gives us real 3D rigid-body simulation, collision/contact-force events, fixed stepping, debug rendering, snapshots, and WASM performance. POGs and slammers now use Rapier's native cylinder colliders instead of auto-generated convex hulls; exact primitive shapes are simpler, cheaper, and give mass/inertia from the geometry Rapier actually understands.
 
 Do not replace with:
 - Phaser / Matter: primarily 2D.
@@ -37,7 +37,7 @@ Do not replace with:
 
 Adopted for pointer/touch drag lifecycle instead of continuing custom gesture bookkeeping.
 
-Poglite owns only the camera-space pull-to-impulse mapping because that is game-specific.
+Poglite owns only the slingshot rule. Pointer projection itself now uses Three.js Raycaster projection onto the horizontal slammer plane, so perspective/FOV/aspect are not approximated by custom screen-axis math.
 
 ## Randomness
 
@@ -119,13 +119,13 @@ This preserves a clean line between reusable tuning UI and Poglite-specific game
 
 ## Visual scene editing
 
-### Triplex — DEFER / USE AS EXTERNAL EDITOR
+### Triplex — HOLD PENDING LICENSE CLARITY
 
-Triplex is an open-source visual workspace for R3F and can work directly on our existing scene components.
+Triplex is technically attractive for visual R3F scene work, but its repository has had explicit licensing ambiguity and currently should not be treated as a dependency we are free to adopt.
 
-**Trigger:** we begin authored environments, prop placement, lighting passes, or composition work where editing coordinates in code becomes slower than visual manipulation.
+**Trigger:** authored environments/lighting make visual editing materially faster **and** the tool has a clear license suitable for our use.
 
-It should complement the codebase, not become a runtime dependency.
+Until then, use Leva plus the existing code/dev-lab workflow and Blender for authored assets.
 
 ## 3D asset pipeline
 
@@ -191,17 +191,15 @@ Likely useful for final pixelation, bloom, vignette, color treatment, and hit ef
 
 ## Performance
 
-### Manual intuition only — NOT ENOUGH LONG TERM
+### R3F built-in performance controls — KEEP / USE FIRST
 
-### Drei PerformanceMonitor or focused R3F perf tooling — DEFER SLIGHTLY
+React Three Fiber already exposes performance regression/adaptive-DPR mechanisms. Prefer those before introducing another runtime monitor.
 
-Use adaptive performance once visual effects/assets begin increasing GPU cost.
+### r3f-perf or other detailed perf panel — DEFER
 
-Prefer the R3F ecosystem's adaptive performance mechanisms for production quality scaling.
+Useful in dev routes when we need draw-call/GPU inspection, but it is not needed to fix today's gameplay and would add another dependency surface.
 
-Use a detailed perf panel only in dev routes.
-
-**Trigger:** first real environment/postprocessing pass or observed mobile frame drops.
+**Trigger:** first real environment/postprocessing pass or observed mobile frame drops on target phones.
 
 ## R3F scene testing
 
@@ -225,7 +223,7 @@ Current route count and navigation requirements do not justify a router dependen
 
 ### GitHub Pages Actions — KEEP
 
-Correct for the current static browser demo. Automatically deploys green `main` builds.
+Correct for the current static browser demo. Automatically deploys green `main` builds. Developer routes are lazy-loaded with React/Vite dynamic imports so Leva/foundry tooling is split out of the normal playable entry path.
 
 **Trigger for another host:** server-side accounts, matchmaking, secure inventory/gacha authority, APIs, or edge/server functions.
 
@@ -293,7 +291,7 @@ Do not make an alpha analytics stack a production dependency before we have play
 1. Real audio -> Howler.
 2. Real 3D assets -> Blender + gltfjsx + glTF Transform.
 3. Large texture payload -> Basis/KTX2.
-4. Heavy visual tuning -> Leva + Triplex.
+4. Heavy visual tuning -> Leva now; revisit a visual R3F editor only after license clarity.
 5. Locked visual direction -> @react-three/postprocessing.
 6. Mobile performance pressure -> R3F adaptive performance tooling.
 7. UI flow complexity -> router/XState only if proven necessary.
