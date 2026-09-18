@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from 'react'
+import { lazy, Suspense, useEffect, type ReactNode } from 'react'
 import { Binder } from './components/Binder'
 import { GameShell } from './components/GameShell'
 import { StackBuilder } from './components/StackBuilder'
@@ -24,7 +24,7 @@ const SlamLab = lazy(() =>
   import('./dev/SlamLab').then((module) => ({ default: module.SlamLab })),
 )
 
-function DevRoute({ children }: { children: React.ReactNode }) {
+function DevRoute({ children }: { children: ReactNode }) {
   return (
     <Suspense fallback={<main className="lab-page"><p>Loading developer tools…</p></main>}>
       {children}
