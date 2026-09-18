@@ -21,6 +21,7 @@ Browser-first collectible physics roguelite built around one tactile action: **s
 - persistent binder with duplicate counts and cosmetic print variants;
 - persistent eight-POG run stack built only from owned unique POG designs;
 - authored POG definitions validated with Zod;
+- deterministic seeded POG art grammar shared by 3D caps, packs, and binder;
 - domain tests for combat and loot;
 - visual developer lenses for slam feel, combat math, and 100-roll loot inspection.
 
@@ -39,6 +40,7 @@ Routes:
 - `/dev/loot` — 100-roll loot wall
 - `/dev/catalog` — all POGs and slammer families at a glance
 - `/dev/pack` — deterministic pack reveal and odds inspection
+- `/dev/foundry` — compare 24 deterministic visual candidates per POG
 - `/binder` — persistent permanent collection
 - `/stack` — choose the eight owned POGs used in runs
 
