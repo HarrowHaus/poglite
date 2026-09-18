@@ -9,6 +9,7 @@ import {
   RigidBody,
   type RapierRigidBody,
 } from '@react-three/rapier'
+import { RigidBodyType } from '@dimforge/rapier3d-compat'
 import { Vector3 } from 'three'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { PogFace } from '../components/PogFace'
@@ -194,6 +195,7 @@ function VerticalSlingScene({
 
     const body = slammerBody.current
     if (body) {
+      body.setBodyType(RigidBodyType.KinematicPositionBased, true)
       body.setTranslation(ANCHOR, true)
       body.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true)
       body.setLinvel({ x: 0, y: 0, z: 0 }, true)
@@ -253,17 +255,12 @@ function VerticalSlingScene({
     if (!body) return
 
     if (phaseRef.current === 'ready') {
-      body.setTranslation(
-        {
-          x: ANCHOR.x + pull.x,
-          y: ANCHOR.y + pull.y,
-          z: ANCHOR.z + pull.z,
-        },
-        true,
-      )
-      body.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true)
-      body.setLinvel({ x: 0, y: 0, z: 0 }, true)
-      body.setAngvel({ x: 0, y: 0, z: 0 }, true)
+      body.setNextKinematicTranslation({
+        x: ANCHOR.x + pull.x,
+        y: ANCHOR.y + pull.y,
+        z: ANCHOR.z + pull.z,
+      })
+      body.setNextKinematicRotation({ x: 0, y: 0, z: 0, w: 1 })
       return
     }
 
@@ -356,6 +353,7 @@ function VerticalSlingScene({
           true,
         )
         body.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true)
+        body.setBodyType(RigidBodyType.Dynamic, true)
         body.setLinvel(launch.velocityCmPerSec, true)
         body.setAngvel(
           { x: 0, y: profile.spinRadPerSec, z: 0 },
@@ -466,6 +464,7 @@ function VerticalSlingScene({
 
       <RigidBody
         name="slammer"
+        type="kinematicPosition"
         ref={slammerBody}
         colliders={false}
         ccd
