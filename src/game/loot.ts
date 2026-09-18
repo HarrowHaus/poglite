@@ -3,6 +3,12 @@ import { seededRng, type Rng } from './rng'
 import type { GeneratedSlammer, Rarity, SlammerAffix, SlammerFamily } from './types'
 
 const rarityOrder: Rarity[] = ['common', 'rare', 'unique', 'legendary']
+const rarityRank: Record<Rarity, number> = {
+  common: 0,
+  rare: 1,
+  unique: 2,
+  legendary: 3,
+}
 
 const rarityPowerBonus: Record<Rarity, number> = {
   common: 0,
@@ -18,29 +24,85 @@ const affixCount: Record<Rarity, number> = {
   legendary: 3,
 }
 
-const AFFIX_POOL: SlammerAffix[] = [
-  { id: 'pog-power-1', kind: 'flatPogPower', amount: 1, text: '+1 Power to flipped POGs.' },
+interface AffixCandidate {
+  minRarity: Rarity
+  affix: SlammerAffix
+}
+
+const AFFIX_POOL: AffixCandidate[] = [
   {
-    id: 'small-pog-2',
-    kind: 'lowPowerBoost',
-    maxBasePower: 5,
-    amount: 2,
-    text: 'POGs with 5 or less base Power deal +2.',
+    minRarity: 'rare',
+    affix: { id: 'pog-power-1', kind: 'flatPogPower', amount: 1, text: '+1 Power to flipped POGs.' },
   },
   {
-    id: 'multi-guard-4',
-    kind: 'multiFlipGuard',
-    minimumFlips: 3,
-    amount: 4,
-    text: 'Flip 3+ POGs: gain 4 Guard.',
+    minRarity: 'unique',
+    affix: { id: 'pog-power-2', kind: 'flatPogPower', amount: 2, text: '+2 Power to flipped POGs.' },
   },
-  { id: 'pog-power-2', kind: 'flatPogPower', amount: 2, text: '+2 Power to flipped POGs.' },
   {
-    id: 'small-pog-3',
-    kind: 'lowPowerBoost',
-    maxBasePower: 5,
-    amount: 3,
-    text: 'POGs with 5 or less base Power deal +3.',
+    minRarity: 'legendary',
+    affix: { id: 'pog-power-3', kind: 'flatPogPower', amount: 3, text: '+3 Power to flipped POGs.' },
+  },
+
+  {
+    minRarity: 'rare',
+    affix: {
+      id: 'small-pog-2',
+      kind: 'lowPowerBoost',
+      maxBasePower: 5,
+      amount: 2,
+      text: 'POGs with 5 or less base Power deal +2.',
+    },
+  },
+  {
+    minRarity: 'unique',
+    affix: {
+      id: 'small-pog-3',
+      kind: 'lowPowerBoost',
+      maxBasePower: 5,
+      amount: 3,
+      text: 'POGs with 5 or less base Power deal +3.',
+    },
+  },
+  {
+    minRarity: 'legendary',
+    affix: {
+      id: 'small-pog-wide-3',
+      kind: 'lowPowerBoost',
+      maxBasePower: 6,
+      amount: 3,
+      text: 'POGs with 6 or less base Power deal +3.',
+    },
+  },
+
+  {
+    minRarity: 'rare',
+    affix: {
+      id: 'multi-guard-4',
+      kind: 'multiFlipGuard',
+      minimumFlips: 3,
+      amount: 4,
+      text: 'Flip 3+ POGs: gain 4 Guard.',
+    },
+  },
+  {
+    minRarity: 'unique',
+    affix: {
+      id: 'multi-guard-6',
+      kind: 'multiFlipGuard',
+      minimumFlips: 3,
+      amount: 6,
+      text: 'Flip 3+ POGs: gain 6 Guard.',
+    },
+  },
+  {
+    minRarity: 'legendary',
+    affix: {
+      id: 'multi-guard-fast-6',
+      kind: 'multiFlipGuard',
+      minimumFlips: 2,
+      amount: 6,
+      text: 'Flip 2+ POGs: gain 6 Guard.',
+    },
   },
 ]
 
@@ -65,19 +127,19 @@ function chooseFamily(rng: Rng): SlammerFamily {
   return SLAMMER_FAMILIES[rng.int(0, SLAMMER_FAMILIES.length - 1)]
 }
 
-function chooseAffixes(rng: Rng, count: number): SlammerAffix[] {
-  const candidates = [...AFFIX_POOL]
+function chooseAffixes(rng: Rng, count: number, rarity: Rarity): SlammerAffix[] {
+  const candidates = AFFIX_POOL
+    .filter((candidate) => rarityRank[candidate.minRarity] <= rarityRank[rarity])
+    .map((candidate) => candidate.affix)
+
   const selected: SlammerAffix[] = []
 
   while (selected.length < count && candidates.length > 0) {
     const index = rng.int(0, candidates.length - 1)
     const candidate = candidates.splice(index, 1)[0]
-    const conflicts = selected.some((current) => {
-      if (current.kind === 'flatPogPower' && candidate.kind === 'flatPogPower') return true
-      if (current.kind === 'lowPowerBoost' && candidate.kind === 'lowPowerBoost') return true
-      return current.id === candidate.id
-    })
-    if (!conflicts) selected.push(candidate)
+
+    if (selected.some((current) => current.kind === candidate.kind)) continue
+    selected.push(candidate)
   }
 
   return selected
@@ -89,7 +151,7 @@ export function rollSlammer(seed: string, depth: number): GeneratedSlammer {
   const family = chooseFamily(rng)
   const level = Math.max(1, 1 + Math.floor(depth / 2) + rng.int(0, 2))
   const power = family.basePower + family.powerPerLevel * (level - 1) + rarityPowerBonus[rarity]
-  const affixes = chooseAffixes(rng, affixCount[rarity])
+  const affixes = chooseAffixes(rng, affixCount[rarity], rarity)
 
   return {
     instanceId: [seed, depth, family.id, rarity].join(':'),
