@@ -9,7 +9,7 @@ import {
   RigidBody,
   type RapierRigidBody,
 } from '@react-three/rapier'
-import { Quaternion, Vector3 } from 'three'
+import { Vector3 } from 'three'
 import { useMemo, useRef, useState } from 'react'
 import { PogFace } from '../components/PogFace'
 import { STARTER_STACK, pogById, slammerFamilyById } from '../game/content'
@@ -20,6 +20,8 @@ import {
   predictBallisticPath,
   predictImpactPoint,
   verticalSlamImpulse,
+  verticalSlamOrientation,
+  verticalSlamYawSpin,
   type VerticalSlingPull,
 } from '../game/verticalSling'
 import { appHref } from '../navigation'
@@ -53,19 +55,6 @@ function stackOffset(index: number) {
 
 function vecLength(v: { x: number; y: number; z: number }) {
   return Math.hypot(v.x, v.y, v.z)
-}
-
-function slammerTiltQuaternion(pull: VerticalSlingPull) {
-  const lateral = Math.hypot(pull.x, pull.z)
-  const lateralShare =
-    pull.y > 0.0001 ? Math.min(1, lateral / (pull.y * 0.48)) : 0
-
-  const dirX = lateral > 0.0001 ? pull.x / lateral : 0
-  const dirZ = lateral > 0.0001 ? pull.z / lateral : 1
-  const axis = new Vector3(dirZ, 0, -dirX).normalize()
-  const angle = BASE_TILT_RADIANS + EXTRA_TILT_RADIANS * lateralShare
-
-  return new Quaternion().setFromAxisAngle(axis, angle)
 }
 
 function TrajectoryPreview({
@@ -264,7 +253,7 @@ function VerticalSlingScene({
       )
       body.setLinvel({ x: 0, y: 0, z: 0 }, true)
       body.setAngvel({ x: 0, y: 0, z: 0 }, true)
-      body.setRotation(slammerTiltQuaternion(pull), true)
+      body.setRotation(verticalSlamOrientation(pull), true)
       return
     }
 
@@ -354,7 +343,7 @@ function VerticalSlingScene({
           true,
         )
         body.setLinvel({ x: 0, y: 0, z: 0 }, true)
-        body.setRotation(slammerTiltQuaternion(nextPull), true)
+        body.setRotation(verticalSlamOrientation(nextPull), true)
         body.setAngvel({ x: 0, y: 0, z: 0 }, true)
 
         releasedAt.current = performance.now()
@@ -364,11 +353,10 @@ function VerticalSlingScene({
         setPhaseBoth('flight')
 
         body.applyImpulse(impulse, true)
-        const spinDirection = nextPull.x < 0 ? -1 : 1
         body.setAngvel(
           {
             x: 0,
-            y: spinDirection * (4.2 + nextPull.power * 7.2),
+            y: verticalSlamYawSpin(nextPull),
             z: 0,
           },
           true,
