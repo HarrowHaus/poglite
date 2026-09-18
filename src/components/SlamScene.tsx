@@ -1,7 +1,7 @@
 import { useDrag } from '@use-gesture/react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { Vector3 } from 'three'
 import { Physics, RigidBody, type RapierRigidBody } from '@react-three/rapier'
+import { Vector3 } from 'three'
 import {
   useEffect,
   useMemo,
@@ -22,6 +22,7 @@ import {
   slammerImpulse,
   type PullVector,
 } from '../game/slamGesture'
+import type { SlamTelemetrySample } from '../game/slamTelemetry'
 import { unlockFeedbackAudio } from '../presentation/audio'
 import { emitFeedback } from '../presentation/events'
 import { normalizeImpactForce } from '../presentation/feedbackMath'
@@ -34,6 +35,7 @@ interface SlamSceneProps {
   debugPhysics?: boolean
   disabled?: boolean
   onResolved: (flippedPogIds: string[]) => void
+  onShotTelemetry?: (sample: SlamTelemetrySample) => void
 }
 
 const POG_RADIUS = 0.58
@@ -42,8 +44,21 @@ const POG_THICKNESS = 0.07
 // Camera is deliberately 30% farther from the table than the initial physics demo.
 const CAMERA_Y = 7.41
 const CAMERA_Z = 8.19
-const SLAMMER_ANCHOR = { x: 0, y: 1.35, z: 1.8 }
 const EMPTY_PULL: PullVector = { x: 0, z: 0, power: 0 }
+
+interface Anchor {
+  x: number
+  y: number
+  z: number
+}
+
+interface ActiveShot {
+  startedAt: number
+  pullPower: number
+  pullDistance: number
+  impactStrength: number
+  timeToImpactMs: number | null
+}
 
 function CameraFeedback({ impact }: { impact: MutableRefObject<number> }) {
   const { camera } = useThree()
@@ -160,18 +175,24 @@ function PogStack({
   )
 }
 
-function PullTether({ pull }: { pull: PullVector }) {
+function PullTether({
+  pull,
+  anchor,
+}: {
+  pull: PullVector
+  anchor: Anchor
+}) {
   const length = Math.hypot(pull.x, pull.z)
   if (length <= 0.02) return null
 
-  const midpointX = SLAMMER_ANCHOR.x + pull.x / 2
-  const midpointZ = SLAMMER_ANCHOR.z + pull.z / 2
+  const midpointX = anchor.x + pull.x / 2
+  const midpointZ = anchor.z + pull.z / 2
   const angle = Math.atan2(pull.x, pull.z)
 
   return (
     <>
       <mesh
-        position={[midpointX, SLAMMER_ANCHOR.y, midpointZ]}
+        position={[midpointX, anchor.y, midpointZ]}
         rotation={[0, angle, 0]}
       >
         <boxGeometry args={[0.045, 0.045, length]} />
@@ -184,7 +205,7 @@ function PullTether({ pull }: { pull: PullVector }) {
       </mesh>
 
       <mesh
-        position={[SLAMMER_ANCHOR.x, 0.018, SLAMMER_ANCHOR.z]}
+        position={[anchor.x, 0.018, anchor.z]}
         rotation={[-Math.PI / 2, 0, 0]}
       >
         <ringGeometry args={[0.22, 0.28, 32]} />
@@ -200,6 +221,7 @@ function Playfield({
   tuning: tuningOverrides,
   disabled = false,
   onResolved,
+  onShotTelemetry,
 }: SlamSceneProps) {
   const tuning = useMemo(
     () => ({ ...DEFAULT_SLAM_TUNING, ...tuningOverrides }),
@@ -211,12 +233,22 @@ function Playfield({
   const cameraImpact = useRef(0)
   const cameraForward = useRef(new Vector3())
   const impactSent = useRef(false)
+  const activeShot = useRef<ActiveShot | null>(null)
   const [pull, setPull] = useState<PullVector>(EMPTY_PULL)
   const [phase, setPhase] = useState<'ready' | 'slamming' | 'resolving'>('ready')
   const [activeIds, setActiveIds] = useState<Set<string>>(new Set())
   const settleTimer = useRef<number | undefined>(undefined)
   const resetTimer = useRef<number | undefined>(undefined)
   const { size, viewport, camera } = useThree()
+
+  const slammerAnchor = useMemo<Anchor>(
+    () => ({
+      x: 0,
+      y: tuning.slammerAnchorY,
+      z: tuning.slammerAnchorZ,
+    }),
+    [tuning.slammerAnchorY, tuning.slammerAnchorZ],
+  )
 
   const restPositions = useMemo(() => {
     const spacing = POG_THICKNESS + tuning.stackGap
@@ -236,9 +268,9 @@ function Playfield({
 
     slammerBody.current.setTranslation(
       {
-        x: SLAMMER_ANCHOR.x + pull.x,
-        y: SLAMMER_ANCHOR.y,
-        z: SLAMMER_ANCHOR.z + pull.z,
+        x: slammerAnchor.x + pull.x,
+        y: slammerAnchor.y,
+        z: slammerAnchor.z + pull.z,
       },
       true,
     )
@@ -256,11 +288,12 @@ function Playfield({
     })
 
     if (slammerBody.current) {
-      slammerBody.current.setTranslation(SLAMMER_ANCHOR, true)
+      slammerBody.current.setTranslation(slammerAnchor, true)
       slammerBody.current.setLinvel({ x: 0, y: 0, z: 0 }, true)
       slammerBody.current.setAngvel({ x: 0, y: 0, z: 0 }, true)
     }
 
+    activeShot.current = null
     setPull(EMPTY_PULL)
     setActiveIds(new Set())
     impactSent.current = false
@@ -276,6 +309,19 @@ function Playfield({
           : [],
       )
 
+      const shot = activeShot.current
+      if (shot && onShotTelemetry) {
+        onShotTelemetry({
+          pullPower: shot.pullPower,
+          pullDistance: shot.pullDistance,
+          impactStrength: shot.impactStrength,
+          timeToImpactMs: shot.timeToImpactMs,
+          resolutionMs: performance.now() - shot.startedAt,
+          flips: flipped.length,
+          missed: shot.timeToImpactMs === null,
+        })
+      }
+
       setActiveIds(new Set(flipped))
       emitFeedback({ type: 'slam:resolved', flips: flipped.length })
       onResolved(flipped)
@@ -289,6 +335,12 @@ function Playfield({
     const impulse = slammerImpulse(
       releasePull,
       family.physics.slamImpulse * tuning.impulseMultiplier,
+      {
+        horizontalBase: tuning.horizontalImpulseBase,
+        horizontalPower: tuning.horizontalImpulsePower,
+        downwardBase: tuning.downwardImpulseBase,
+        downwardPower: tuning.downwardImpulsePower,
+      },
     )
     if (!impulse) {
       setPull(EMPTY_PULL)
@@ -298,6 +350,13 @@ function Playfield({
     unlockFeedbackAudio()
     emitFeedback({ type: 'slam:start' })
     impactSent.current = false
+    activeShot.current = {
+      startedAt: performance.now(),
+      pullPower: releasePull.power,
+      pullDistance: Math.hypot(releasePull.x, releasePull.z),
+      impactStrength: 0,
+      timeToImpactMs: null,
+    }
     setActiveIds(new Set())
     setPhase('slamming')
 
@@ -330,6 +389,7 @@ function Playfield({
         viewport.width / size.width,
         viewport.height / size.height,
         basis,
+        tuning.maxPullWorld,
       )
 
       setPull(nextPull)
@@ -353,7 +413,7 @@ function Playfield({
 
       <Table />
       <PogStack ids={pogIds} bodies={pogBodies} tuning={tuning} activeIds={activeIds} />
-      {phase === 'ready' && <PullTether pull={pull} />}
+      {phase === 'ready' && <PullTether pull={pull} anchor={slammerAnchor} />}
 
       <RigidBody
         name="slammer"
@@ -364,7 +424,7 @@ function Playfield({
         restitution={tuning.slammerRestitution}
         linearDamping={0.22}
         angularDamping={0.18}
-        position={[SLAMMER_ANCHOR.x, SLAMMER_ANCHOR.y, SLAMMER_ANCHOR.z]}
+        position={[slammerAnchor.x, slammerAnchor.y, slammerAnchor.z]}
         onContactForce={(event) => {
           if (phase !== 'slamming' || impactSent.current) return
           const otherName = event.other.rigidBodyObject?.name ?? ''
@@ -375,6 +435,13 @@ function Playfield({
 
           impactSent.current = true
           cameraImpact.current = Math.max(cameraImpact.current, strength)
+
+          const shot = activeShot.current
+          if (shot) {
+            shot.impactStrength = strength
+            shot.timeToImpactMs = performance.now() - shot.startedAt
+          }
+
           emitFeedback({ type: 'slam:impact', strength })
         }}
       >
