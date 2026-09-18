@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_VERTICAL_SLING,
   constrainVerticalPull,
+  predictBallisticPath,
+  predictImpactPoint,
   verticalSlamImpulse,
 } from './verticalSling'
 
@@ -47,5 +49,33 @@ describe('vertical Angry-Birds-style slam', () => {
       ),
       { numRuns: 200 },
     )
+  })
+})
+
+
+describe('vertical trajectory prediction', () => {
+  it('predicts a descending impact at the requested plane', () => {
+    const start = { x: -0.2, y: 2.2, z: 0.1 }
+    const velocity = { x: 1.5, y: -8, z: -0.5 }
+    const impact = predictImpactPoint(start, velocity, -9.81, 0.4)
+
+    expect(impact).not.toBeNull()
+    expect(impact!.y).toBeCloseTo(0.4, 8)
+    expect(impact!.t).toBeGreaterThan(0)
+  })
+
+  it('produces an ordered ballistic preview that reaches the floor plane', () => {
+    const points = predictBallisticPath(
+      { x: 0, y: 2, z: 0 },
+      { x: 0.5, y: -6, z: 0.2 },
+      -9.81,
+      0.35,
+      0.04,
+      1,
+    )
+
+    expect(points.length).toBeGreaterThan(2)
+    expect(points[0].t).toBe(0)
+    expect(points[points.length - 1].y).toBeLessThanOrEqual(0.35)
   })
 })
