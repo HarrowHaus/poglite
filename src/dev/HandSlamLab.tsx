@@ -22,6 +22,11 @@ import {
   REAL_WORLD,
   realSlammerProfile,
 } from '../physics/pogPhysicalProfile'
+import {
+  HAND_SLAM,
+  launchFromHandVelocity,
+  type HandVelocity,
+} from '../physics/handSlam'
 import { projectClientPointToPlane } from '../presentation/pointerProjection'
 
 const POG_COUNT = STARTER_STACK.length
@@ -35,11 +40,6 @@ const STACK_TOP_Y =
 const REST_Y = STACK_TOP_Y + 5.4
 const MAX_HOLD_Y = STACK_TOP_Y + 10
 const HAND_XZ_LIMIT = 3.2
-const MIN_HAND_DOWN_SPEED = 10
-const FULL_HAND_DOWN_SPEED = 65
-const MIN_DYNAMIC_SPEED_MPS = 2.35
-const MAX_DYNAMIC_SPEED_MPS = 4.25
-const MAX_LATERAL_FRACTION = 0.32
 const MAX_RESOLVE_MS = 1250
 
 function clamp(value: number, min: number, max: number) {
@@ -68,12 +68,6 @@ function CameraRig() {
   return null
 }
 
-interface HandVelocity {
-  x: number
-  y: number
-  z: number
-}
-
 interface Result {
   flips: string[]
   handSpeedCmPerSec: number
@@ -82,48 +76,6 @@ interface Result {
   releaseToImpactMs: number | null
   releaseToResolveMs: number
   scatterRadiusCm: number
-}
-
-function launchFromHandVelocity(velocity: HandVelocity) {
-  const downward = Math.max(0, -velocity.y)
-  const strength = clamp(
-    (downward - MIN_HAND_DOWN_SPEED) /
-      (FULL_HAND_DOWN_SPEED - MIN_HAND_DOWN_SPEED),
-    0,
-    1,
-  )
-
-  const speedMps =
-    MIN_DYNAMIC_SPEED_MPS +
-    (MAX_DYNAMIC_SPEED_MPS - MIN_DYNAMIC_SPEED_MPS) * strength
-
-  const lateralSpeed = Math.hypot(velocity.x, velocity.z)
-  const rawLateralFraction =
-    downward > 0.001 ? lateralSpeed / downward : 0
-  const lateralFraction = Math.min(
-    MAX_LATERAL_FRACTION,
-    rawLateralFraction,
-  )
-
-  const lateralLength = Math.hypot(velocity.x, velocity.z)
-  const dirX = lateralLength > 0.001 ? velocity.x / lateralLength : 0
-  const dirZ = lateralLength > 0.001 ? velocity.z / lateralLength : 0
-
-  const speedCmPerSec = speedMps * REAL_WORLD.unitsPerMeter
-  const verticalFraction = Math.sqrt(
-    Math.max(0.001, 1 - lateralFraction * lateralFraction),
-  )
-
-  return {
-    strength,
-    speedMps,
-    lateralFraction,
-    velocity: {
-      x: dirX * lateralFraction * speedCmPerSec,
-      y: -verticalFraction * speedCmPerSec,
-      z: dirZ * lateralFraction * speedCmPerSec,
-    },
-  }
 }
 
 function HandSlamScene({
@@ -427,7 +379,7 @@ function HandSlamScene({
       const releaseGateY =
         STACK_TOP_Y + profile.thicknessCm / 2 + 1.4
       const slamming =
-        smoothVelocity.current.y < -MIN_HAND_DOWN_SPEED &&
+        smoothVelocity.current.y < -HAND_SLAM.minDownSpeedCmPerSec &&
         desired.y <= releaseGateY
 
       if (down && slamming) {
