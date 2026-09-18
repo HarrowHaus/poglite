@@ -15,16 +15,17 @@ export interface ClientRectLike {
 
 const raycaster = new Raycaster()
 const pointerNdc = new Vector2()
-const horizontalPlane = new Plane()
-const planeNormal = new Vector3(0, 1, 0)
+const plane = new Plane()
+const horizontalNormal = new Vector3(0, 1, 0)
 const intersection = new Vector3()
 
-export function projectClientPointToHorizontalPlane(
+export function projectClientPointToPlane(
   camera: Camera,
   clientX: number,
   clientY: number,
   rect: ClientRectLike,
-  planeY: number,
+  planePoint: { x: number; y: number; z: number },
+  planeNormal: { x: number; y: number; z: number },
 ): Vector3 | null {
   if (rect.width <= 0 || rect.height <= 0) return null
 
@@ -36,8 +37,34 @@ export function projectClientPointToHorizontalPlane(
   camera.updateMatrixWorld()
   raycaster.setFromCamera(pointerNdc, camera)
 
-  horizontalPlane.set(planeNormal, -planeY)
-  const hit = raycaster.ray.intersectPlane(horizontalPlane, intersection)
+  const normal = new Vector3(
+    planeNormal.x,
+    planeNormal.y,
+    planeNormal.z,
+  ).normalize()
 
+  plane.setFromNormalAndCoplanarPoint(
+    normal,
+    new Vector3(planePoint.x, planePoint.y, planePoint.z),
+  )
+
+  const hit = raycaster.ray.intersectPlane(plane, intersection)
   return hit ? hit.clone() : null
+}
+
+export function projectClientPointToHorizontalPlane(
+  camera: Camera,
+  clientX: number,
+  clientY: number,
+  rect: ClientRectLike,
+  planeY: number,
+): Vector3 | null {
+  return projectClientPointToPlane(
+    camera,
+    clientX,
+    clientY,
+    rect,
+    { x: 0, y: planeY, z: 0 },
+    horizontalNormal,
+  )
 }
