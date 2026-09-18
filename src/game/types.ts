@@ -73,3 +73,22 @@ export interface SlamResolution {
   playerDamageTaken: number
   next: BattleState
 }
+
+export type PrintTreatment = 'standard' | 'foil' | 'prism' | 'error'
+
+export interface PackPull {
+  pullId: string
+  pogId: string
+  print: PrintTreatment
+}
+
+export interface PackResult {
+  packId: string
+  pulls: PackPull[]
+}
+
+export interface CollectionEntry {
+  pogId: string
+  copies: number
+  prints: Record<PrintTreatment, number>
+}

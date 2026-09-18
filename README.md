@@ -17,6 +17,8 @@ Browser-first collectible physics roguelite built around one tactile action: **s
 - HP / Power / Guard only;
 - seeded slammer family + level + rarity + affix generation;
 - five-fight run cadence with a three-slammer reward choice between encounters;
+- one permanent five-POG completion pack per cleared run;
+- persistent binder with duplicate counts and cosmetic print variants;
 - authored POG definitions validated with Zod;
 - domain tests for combat and loot;
 - visual developer lenses for slam feel, combat math, and 100-roll loot inspection.
@@ -35,6 +37,8 @@ Routes:
 - `/dev/combat` — combat math
 - `/dev/loot` — 100-roll loot wall
 - `/dev/catalog` — all POGs and slammer families at a glance
+- `/dev/pack` — deterministic pack reveal and odds inspection
+- `/binder` — persistent permanent collection
 
 Verification:
 

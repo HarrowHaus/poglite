@@ -15,9 +15,11 @@ interface GameStore {
   slammer: GeneratedSlammer
   rewards: GeneratedSlammer[]
   lastResolution?: SlamResolution
+  completionPackClaimed: boolean
   resolve: (flippedPogIds: string[]) => SlamResolution
   openReward: () => void
   chooseReward: (instanceId: string) => void
+  claimCompletionPack: () => boolean
   restartRun: () => void
 }
 
@@ -33,6 +35,7 @@ function initialRun() {
     slammer: starterSlammer,
     rewards: [] as GeneratedSlammer[],
     lastResolution: undefined,
+    completionPackClaimed: false,
   }
 }
 
@@ -82,6 +85,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
       rewards: [],
       lastResolution: undefined,
     })
+  },
+
+  claimCompletionPack() {
+    const state = get()
+    if (state.phase !== 'complete' || state.completionPackClaimed) return false
+    set({ completionPackClaimed: true })
+    return true
   },
 
   restartRun() {

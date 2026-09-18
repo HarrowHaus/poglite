@@ -34,4 +34,15 @@ describe('run store', () => {
     expect(next.battle.playerHp).toBe(next.battle.playerMaxHp)
     expect(next.lastResolution).toBeUndefined()
   })
+
+  it('allows exactly one completion-pack claim per run', () => {
+    useGameStore.setState({ phase: 'complete', completionPackClaimed: false })
+
+    expect(useGameStore.getState().claimCompletionPack()).toBe(true)
+    expect(useGameStore.getState().completionPackClaimed).toBe(true)
+    expect(useGameStore.getState().claimCompletionPack()).toBe(false)
+
+    useGameStore.getState().restartRun()
+    expect(useGameStore.getState().completionPackClaimed).toBe(false)
+  })
 })
