@@ -1,3 +1,7 @@
+import { uniformFloat64 } from 'pure-rand/distribution/uniformFloat64'
+import { uniformInt } from 'pure-rand/distribution/uniformInt'
+import { xoroshiro128plus } from 'pure-rand/generator/xoroshiro128plus'
+
 export interface Rng {
   next(): number
   int(minInclusive: number, maxInclusive: number): number
@@ -9,24 +13,18 @@ function hashSeed(seed: string): number {
     hash ^= seed.charCodeAt(i)
     hash = Math.imul(hash, 16777619)
   }
-  return hash >>> 0
+  return hash | 0
 }
 
 export function seededRng(seed: string): Rng {
-  let state = hashSeed(seed) || 0x6d2b79f5
-
-  const next = () => {
-    state += 0x6d2b79f5
-    let value = state
-    value = Math.imul(value ^ (value >>> 15), value | 1)
-    value ^= value + Math.imul(value ^ (value >>> 7), value | 61)
-    return ((value ^ (value >>> 14)) >>> 0) / 4294967296
-  }
+  const generator = xoroshiro128plus(hashSeed(seed) || 0x6d2b79f5)
 
   return {
-    next,
+    next() {
+      return uniformFloat64(generator)
+    },
     int(minInclusive, maxInclusive) {
-      return Math.floor(next() * (maxInclusive - minInclusive + 1)) + minInclusive
+      return uniformInt(generator, minInclusive, maxInclusive)
     },
   }
 }
