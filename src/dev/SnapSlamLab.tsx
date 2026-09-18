@@ -14,6 +14,7 @@ import { isFaceUpRotation } from '../game/slamPhysics'
 import { pullFromWorldDelta, type PullVector } from '../game/slamGesture'
 import { projectClientPointToHorizontalPlane } from '../presentation/pointerProjection'
 import { rollSlammer } from '../game/loot'
+import { appHref } from '../navigation'
 
 const POG_RADIUS = 0.58
 const POG_THICKNESS = 0.07
@@ -364,7 +365,7 @@ export function SnapSlamLab() {
           Target: under ~1 second from release to readable result. No projectile miss
           phase, no fixed 1.65 second wait.
         </p>
-        <a className="binder-shortcut" href="../">BACK TO CURRENT GAME</a>
+        <a className="binder-shortcut" href={appHref('/')}>BACK TO CURRENT GAME</a>
       </section>
 
       <section className="lab-canvas">
