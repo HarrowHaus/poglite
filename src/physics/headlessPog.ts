@@ -1,6 +1,6 @@
 import * as RAPIER from '@dimforge/rapier3d-compat'
 import { SLAMMER_FAMILIES } from '../game/content'
-import { isFaceUpRotation } from '../game/slamPhysics'
+import { capUpDot, isFaceUpRotation } from '../game/slamPhysics'
 import {
   constrainVerticalPull,
   verticalSlamImpulse,
@@ -38,6 +38,9 @@ export interface HeadlessShotInput {
   baseTilt?: number
   extraTilt?: number
   spinScale?: number
+  capRestitution?: number
+  tableRestitution?: number
+  slammerRestitution?: number
 }
 
 export interface HeadlessShotMetrics {
@@ -56,6 +59,10 @@ export interface HeadlessShotMetrics {
   meanCapPitchRollSpeed: number
   scatterRadius: number
   maxHeight: number
+  maxCapRise: number
+  meanMaxCapRise: number
+  everFaceUpCount: number
+  maxUpDot: number
 }
 
 function familyById(id: string) {
@@ -85,6 +92,9 @@ export async function simulateVerticalShot(
   const power = Math.max(0, Math.min(1, input.power))
   const lateral = Math.max(-1, Math.min(1, input.lateral))
   const jitterSeed = input.jitterSeed ?? 'matrix'
+  const capRestitution = input.capRestitution ?? 0.03
+  const tableRestitution = input.tableRestitution ?? 0
+  const slammerRestitution = input.slammerRestitution ?? 0.09
 
   const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 })
   world.timestep = TIMESTEP
@@ -95,6 +105,8 @@ export async function simulateVerticalShot(
     .setTranslation(0, -0.22, 0)
     .setFriction(TABLE_FRICTION)
     .setFrictionCombineRule(RAPIER.CoefficientCombineRule.Min)
+    .setRestitution(tableRestitution)
+    .setRestitutionCombineRule(RAPIER.CoefficientCombineRule.Max)
   world.createCollider(ground)
 
   const caps: RAPIER.RigidBody[] = []
@@ -123,8 +135,8 @@ export async function simulateVerticalShot(
       .setMass(POG_MASS)
       .setFriction(CAP_FRICTION)
       .setFrictionCombineRule(RAPIER.CoefficientCombineRule.Min)
-      .setRestitution(0.03)
-      .setRestitutionCombineRule(RAPIER.CoefficientCombineRule.Min)
+      .setRestitution(capRestitution)
+      .setRestitutionCombineRule(RAPIER.CoefficientCombineRule.Max)
       .setContactSkin(0.0015)
 
     const collider = world.createCollider(colliderDesc, body)
@@ -157,6 +169,10 @@ export async function simulateVerticalShot(
       meanCapPitchRollSpeed: 0,
       scatterRadius: 0,
       maxHeight: 0,
+      maxCapRise: 0,
+      meanMaxCapRise: 0,
+      everFaceUpCount: 0,
+      maxUpDot: -1,
     }
   }
 
@@ -188,7 +204,7 @@ export async function simulateVerticalShot(
       .setMass(family.physics.mass)
       .setFriction(SLAMMER_FRICTION)
       .setFrictionCombineRule(RAPIER.CoefficientCombineRule.Max)
-      .setRestitution(0.09)
+      .setRestitution(slammerRestitution)
       .setRestitutionCombineRule(RAPIER.CoefficientCombineRule.Max),
     slammerBody,
   )
@@ -212,6 +228,13 @@ export async function simulateVerticalShot(
   let totalTangentImpulse = 0
   let maxCapPitchRollSpeed = 0
   const perCapPeak = new Array(POG_COUNT).fill(0) as number[]
+  const initialHeights = Array.from(
+    { length: POG_COUNT },
+    (_, index) => 0.04 + index * STACK_SPACING,
+  )
+  const maxRiseByCap = new Array(POG_COUNT).fill(0) as number[]
+  const everFaceUp = new Array(POG_COUNT).fill(false) as boolean[]
+  let maxUpDot = -1
   let maxHeight = 0
   let stableFrames = 0
   let settleMs = MAX_SIM_SECONDS * 1000
@@ -259,9 +282,17 @@ export async function simulateVerticalShot(
     for (let index = 0; index < caps.length; index += 1) {
       const cap = caps[index]
       const angular = pitchRollSpeed(cap.angvel())
+      const translation = cap.translation()
+      const upDot = capUpDot(cap.rotation())
       perCapPeak[index] = Math.max(perCapPeak[index], angular)
       maxCapPitchRollSpeed = Math.max(maxCapPitchRollSpeed, angular)
-      maxHeight = Math.max(maxHeight, cap.translation().y)
+      maxHeight = Math.max(maxHeight, translation.y)
+      maxRiseByCap[index] = Math.max(
+        maxRiseByCap[index],
+        translation.y - initialHeights[index],
+      )
+      maxUpDot = Math.max(maxUpDot, upDot)
+      if (upDot > FACE_UP_THRESHOLD) everFaceUp[index] = true
     }
 
     if (firstImpactMs !== null && elapsedMs - firstImpactMs > 380) {
@@ -304,6 +335,11 @@ export async function simulateVerticalShot(
   const meanCapPitchRollSpeed =
     perCapPeak.reduce((sum, value) => sum + value, 0) /
     perCapPeak.length
+  const maxCapRise = Math.max(...maxRiseByCap)
+  const meanMaxCapRise =
+    maxRiseByCap.reduce((sum, value) => sum + value, 0) /
+    maxRiseByCap.length
+  const everFaceUpCount = everFaceUp.filter(Boolean).length
 
   // These refs are assigned from Rapier's synchronous contactPair callback.
   // TypeScript cannot infer callback mutation across the simulation loop.
@@ -344,6 +380,10 @@ export async function simulateVerticalShot(
     meanCapPitchRollSpeed,
     scatterRadius,
     maxHeight,
+    maxCapRise,
+    meanMaxCapRise,
+    everFaceUpCount,
+    maxUpDot,
   }
 
   world.free()
