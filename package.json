@@ -33,6 +33,7 @@
     "vitest": "^3.0.0",
     "fast-check": "^4.10.1",
     "@playwright/test": "^1.63.0",
-    "@dimforge/rapier3d-compat": "0.19.2"
+    "@dimforge/rapier3d-compat": "0.19.2",
+    "@types/node": "^24.0.0"
   }
 }
