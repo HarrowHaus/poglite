@@ -33,6 +33,7 @@ Routes:
 - `/dev/slam` — physics feel/tuning
 - `/dev/combat` — combat math
 - `/dev/loot` — 100-roll loot wall
+- `/dev/catalog` — all POGs and slammer families at a glance
 
 Verification:
 
