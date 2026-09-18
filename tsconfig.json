@@ -21,7 +21,8 @@
     "jsx": "react-jsx",
     "types": [
       "vitest/globals",
-      "vite/client"
+      "vite/client",
+      "node"
     ]
   },
   "include": [

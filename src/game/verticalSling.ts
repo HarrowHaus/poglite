@@ -18,6 +18,16 @@ export interface PredictedPoint {
   t: number
 }
 
+export interface QuaternionLike {
+  x: number
+  y: number
+  z: number
+  w: number
+}
+
+export const DEFAULT_SLAMMER_BASE_TILT = 0.13
+export const DEFAULT_SLAMMER_EXTRA_TILT = 0.16
+
 export const DEFAULT_VERTICAL_SLING: VerticalSlingConfig = {
   maxVerticalPull: 1.55,
   lateralRatio: 0.48,
@@ -50,6 +60,45 @@ export function constrainVerticalPull(
     z,
     power: up / config.maxVerticalPull,
   }
+}
+
+
+export function verticalSlamOrientation(
+  pull: VerticalSlingPull,
+  baseTilt = DEFAULT_SLAMMER_BASE_TILT,
+  extraTilt = DEFAULT_SLAMMER_EXTRA_TILT,
+): QuaternionLike {
+  const lateral = Math.hypot(pull.x, pull.z)
+  const lateralShare =
+    pull.y > 0.0001
+      ? Math.min(1, lateral / (pull.y * DEFAULT_VERTICAL_SLING.lateralRatio))
+      : 0
+
+  const dirX = lateral > 0.0001 ? pull.x / lateral : 0
+  const dirZ = lateral > 0.0001 ? pull.z / lateral : 1
+
+  const axisX = dirZ
+  const axisZ = -dirX
+  const axisLength = Math.hypot(axisX, axisZ) || 1
+  const angle = baseTilt + extraTilt * lateralShare
+  const half = angle / 2
+  const sinHalf = Math.sin(half)
+
+  return {
+    x: (axisX / axisLength) * sinHalf,
+    y: 0,
+    z: (axisZ / axisLength) * sinHalf,
+    w: Math.cos(half),
+  }
+}
+
+export function verticalSlamYawSpin(
+  pull: VerticalSlingPull,
+  baseSpin = 4.2,
+  powerSpin = 7.2,
+): number {
+  const direction = pull.x < 0 ? -1 : 1
+  return direction * (baseSpin + pull.power * powerSpin)
 }
 
 export function verticalSlamImpulse(
