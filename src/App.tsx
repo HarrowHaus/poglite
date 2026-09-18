@@ -23,6 +23,9 @@ const PackLab = lazy(() =>
 const SlamLab = lazy(() =>
   import('./dev/SlamLab').then((module) => ({ default: module.SlamLab })),
 )
+const SnapSlamLab = lazy(() =>
+  import('./dev/SnapSlamLab').then((module) => ({ default: module.SnapSlamLab })),
+)
 
 function DevRoute({ children }: { children: ReactNode }) {
   return (
@@ -44,5 +47,6 @@ export function App() {
   if (path === '/dev/loot') return <DevRoute><LootLab /></DevRoute>
   if (path === '/dev/combat') return <DevRoute><CombatLab /></DevRoute>
   if (path === '/dev/slam') return <DevRoute><SlamLab /></DevRoute>
+  if (path === '/dev/snap') return <DevRoute><SnapSlamLab /></DevRoute>
   return <GameShell />
 }

@@ -84,3 +84,12 @@ test('pull-and-release gesture resolves a turn in the production camera', async 
     timeout: 5_000,
   })
 })
+
+
+test('snap-slam experiment route loads beside the current mechanic', async ({ page }) => {
+  await loadAndAssertRuntime(page, './dev/snap')
+
+  await expect(page).toHaveURL(/\/poglite\/dev\/snap$/)
+  await expect(page.getByRole('heading', { name: 'Strike, don\'t throw.' })).toBeVisible()
+  await expect(page.locator('canvas')).toBeVisible()
+})
