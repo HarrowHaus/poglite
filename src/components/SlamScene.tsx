@@ -1,5 +1,6 @@
 import { useDrag } from '@use-gesture/react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
+import { Vector3 } from 'three'
 import { Physics, RigidBody, type RapierRigidBody } from '@react-three/rapier'
 import {
   useEffect,
@@ -16,7 +17,8 @@ import {
   type SlamTuning,
 } from '../game/slamPhysics'
 import {
-  pullFromMovement,
+  pullFromScreenMovement,
+  screenPlaneBasisFromCameraForward,
   slammerImpulse,
   type PullVector,
 } from '../game/slamGesture'
@@ -207,13 +209,14 @@ function Playfield({
   const slammerBody = useRef<RapierRigidBody>(null)
   const pogBodies = useRef<Array<RapierRigidBody | null>>([])
   const cameraImpact = useRef(0)
+  const cameraForward = useRef(new Vector3())
   const impactSent = useRef(false)
   const [pull, setPull] = useState<PullVector>(EMPTY_PULL)
   const [phase, setPhase] = useState<'ready' | 'slamming' | 'resolving'>('ready')
   const [activeIds, setActiveIds] = useState<Set<string>>(new Set())
   const settleTimer = useRef<number | undefined>(undefined)
   const resetTimer = useRef<number | undefined>(undefined)
-  const { size, viewport } = useThree()
+  const { size, viewport, camera } = useThree()
 
   const restPositions = useMemo(() => {
     const spacing = POG_THICKNESS + tuning.stackGap
@@ -319,11 +322,14 @@ function Playfield({
 
       if (first) unlockFeedbackAudio()
 
-      const nextPull = pullFromMovement(
+      const forward = camera.getWorldDirection(cameraForward.current)
+      const basis = screenPlaneBasisFromCameraForward(forward.x, forward.z)
+      const nextPull = pullFromScreenMovement(
         movementX,
         movementY,
         viewport.width / size.width,
         viewport.height / size.height,
+        basis,
       )
 
       setPull(nextPull)
