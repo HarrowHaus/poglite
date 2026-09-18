@@ -1,3 +1,5 @@
+import { useMemo } from 'react'
+import { createPogArtCanvas } from '../art/pogArt'
 import { pogById } from '../game/content'
 import type { PrintTreatment } from '../game/types'
 
@@ -11,6 +13,10 @@ export function PogMedallion({
   size?: 'small' | 'normal' | 'large'
 }) {
   const pog = pogById(pogId)
+  const src = useMemo(
+    () => createPogArtCanvas(pog, 0, 256).toDataURL(),
+    [pog],
+  )
 
   return (
     <div
@@ -22,9 +28,7 @@ export function PogMedallion({
       ].join(' ')}
       aria-label={pog.name + ', ' + pog.rarity + ', ' + print}
     >
-      <span className="pog-medallion-mark">{pog.face.mark}</span>
-      <span className="pog-medallion-caption">{pog.face.caption}</span>
-      <b>{pog.power}</b>
+      <img src={src} alt="" />
       {print !== 'standard' && <i>{print}</i>}
     </div>
   )
