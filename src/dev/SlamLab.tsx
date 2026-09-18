@@ -1,178 +1,267 @@
+import { folder, Leva, useControls } from 'leva'
 import { useMemo, useState } from 'react'
-import { STARTER_STACK } from '../game/content'
-import { rollSlammer } from '../game/loot'
-import { DEFAULT_SLAM_TUNING, type SlamTuning } from '../game/slamPhysics'
 import { SlamScene } from '../components/SlamScene'
+import { SLAMMER_FAMILIES, STARTER_STACK, slammerFamilyById } from '../game/content'
+import { DEFAULT_SLAM_TUNING, type SlamTuning } from '../game/slamPhysics'
+import type { SlamTelemetrySample } from '../game/slamTelemetry'
+import type { GeneratedSlammer } from '../game/types'
 
-function RangeControl({
-  label,
-  value,
-  min,
-  max,
-  step,
-  onChange,
-}: {
-  label: string
-  value: number
-  min: number
-  max: number
-  step: number
-  onChange: (value: number) => void
-}) {
-  return (
-    <label className="tuning-control">
-      <span>{label}</span>
-      <strong>{value}</strong>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(event) => onChange(Number(event.target.value))}
-      />
-    </label>
-  )
+function average(values: number[]) {
+  if (values.length === 0) return 0
+  return values.reduce((sum, value) => sum + value, 0) / values.length
 }
 
 export function SlamLab() {
-  const [tuning, setTuning] = useState<SlamTuning>(DEFAULT_SLAM_TUNING)
-  const [debugPhysics, setDebugPhysics] = useState(false)
-  const [results, setResults] = useState<number[]>([])
-  const slammer = useMemo(() => rollSlammer('slam-lab', 4), [])
+  const [samples, setSamples] = useState<SlamTelemetrySample[]>([])
 
-  const set = <K extends keyof SlamTuning>(key: K, value: SlamTuning[K]) => {
-    setTuning((current) => ({ ...current, [key]: value }))
-  }
+  const familyOptions = useMemo(
+    () =>
+      Object.fromEntries(
+        SLAMMER_FAMILIES.map((family) => [family.name, family.id]),
+      ),
+    [],
+  )
 
-  const recent = results.slice(-20)
-  const average = recent.length
-    ? recent.reduce((sum, value) => sum + value, 0) / recent.length
-    : 0
-  const histogram = Array.from({ length: STARTER_STACK.length + 1 }, (_, flipCount) =>
-    recent.filter((value) => value === flipCount).length,
+  const controls = useControls({
+    Shot: folder({
+      familyId: {
+        value: SLAMMER_FAMILIES[0].id,
+        options: familyOptions,
+        label: 'Slammer family',
+      },
+      maxPullWorld: {
+        value: DEFAULT_SLAM_TUNING.maxPullWorld,
+        min: 0.7,
+        max: 2.6,
+        step: 0.05,
+        label: 'Max pull',
+      },
+      horizontalImpulseBase: {
+        value: DEFAULT_SLAM_TUNING.horizontalImpulseBase,
+        min: 0.3,
+        max: 2.4,
+        step: 0.05,
+        label: 'Horizontal base',
+      },
+      horizontalImpulsePower: {
+        value: DEFAULT_SLAM_TUNING.horizontalImpulsePower,
+        min: 0,
+        max: 2,
+        step: 0.05,
+        label: 'Power gain',
+      },
+      downwardImpulseBase: {
+        value: DEFAULT_SLAM_TUNING.downwardImpulseBase,
+        min: 0,
+        max: 0.8,
+        step: 0.01,
+        label: 'Downward base',
+      },
+      downwardImpulsePower: {
+        value: DEFAULT_SLAM_TUNING.downwardImpulsePower,
+        min: 0,
+        max: 0.8,
+        step: 0.01,
+        label: 'Downward gain',
+      },
+      slammerAnchorY: {
+        value: DEFAULT_SLAM_TUNING.slammerAnchorY,
+        min: 0.5,
+        max: 2.5,
+        step: 0.05,
+        label: 'Anchor height',
+      },
+      slammerAnchorZ: {
+        value: DEFAULT_SLAM_TUNING.slammerAnchorZ,
+        min: 0.8,
+        max: 3.5,
+        step: 0.05,
+        label: 'Anchor distance',
+      },
+      impulseMultiplier: {
+        value: DEFAULT_SLAM_TUNING.impulseMultiplier,
+        min: 0.55,
+        max: 1.6,
+        step: 0.05,
+        label: 'Family impulse ×',
+      },
+    }),
+    Caps: folder({
+      pogFriction: {
+        value: DEFAULT_SLAM_TUNING.pogFriction,
+        min: 0.2,
+        max: 1.2,
+        step: 0.02,
+        label: 'POG friction',
+      },
+      pogRestitution: {
+        value: DEFAULT_SLAM_TUNING.pogRestitution,
+        min: 0,
+        max: 0.5,
+        step: 0.01,
+        label: 'POG bounce',
+      },
+      pogLinearDamping: {
+        value: DEFAULT_SLAM_TUNING.pogLinearDamping,
+        min: 0,
+        max: 1,
+        step: 0.02,
+        label: 'Linear damping',
+      },
+      pogAngularDamping: {
+        value: DEFAULT_SLAM_TUNING.pogAngularDamping,
+        min: 0,
+        max: 1,
+        step: 0.02,
+        label: 'Angular damping',
+      },
+      stackGap: {
+        value: DEFAULT_SLAM_TUNING.stackGap,
+        min: 0,
+        max: 0.03,
+        step: 0.001,
+        label: 'Stack gap',
+      },
+      faceUpThreshold: {
+        value: DEFAULT_SLAM_TUNING.faceUpThreshold,
+        min: 0,
+        max: 0.8,
+        step: 0.05,
+        label: 'Face-up threshold',
+      },
+    }),
+    Resolution: folder({
+      settleMs: {
+        value: DEFAULT_SLAM_TUNING.settleMs,
+        min: 900,
+        max: 2600,
+        step: 50,
+        label: 'Resolve after ms',
+      },
+      debugPhysics: {
+        value: false,
+        label: 'Rapier colliders',
+      },
+    }),
+  })
+
+  const tuning: SlamTuning = useMemo(
+    () => ({
+      ...DEFAULT_SLAM_TUNING,
+      maxPullWorld: controls.maxPullWorld,
+      horizontalImpulseBase: controls.horizontalImpulseBase,
+      horizontalImpulsePower: controls.horizontalImpulsePower,
+      downwardImpulseBase: controls.downwardImpulseBase,
+      downwardImpulsePower: controls.downwardImpulsePower,
+      slammerAnchorY: controls.slammerAnchorY,
+      slammerAnchorZ: controls.slammerAnchorZ,
+      impulseMultiplier: controls.impulseMultiplier,
+      pogFriction: controls.pogFriction,
+      pogRestitution: controls.pogRestitution,
+      pogLinearDamping: controls.pogLinearDamping,
+      pogAngularDamping: controls.pogAngularDamping,
+      stackGap: controls.stackGap,
+      faceUpThreshold: controls.faceUpThreshold,
+      settleMs: controls.settleMs,
+    }),
+    [controls],
+  )
+
+  const slammer: GeneratedSlammer = useMemo(() => {
+    const family = slammerFamilyById(controls.familyId)
+    return {
+      instanceId: 'slam-lab:' + family.id,
+      familyId: family.id,
+      name: family.name + ' LAB',
+      rarity: 'common',
+      level: 1,
+      power: family.basePower,
+      affixes: [],
+    }
+  }, [controls.familyId])
+
+  const recent = samples.slice(-50)
+  const impacts = recent.filter((sample) => sample.timeToImpactMs !== null)
+  const misses = recent.filter((sample) => sample.missed).length
+
+  const avgPull = average(recent.map((sample) => sample.pullPower))
+  const avgImpact = average(impacts.map((sample) => sample.impactStrength))
+  const avgImpactTime = average(
+    impacts.map((sample) => sample.timeToImpactMs ?? 0),
+  )
+  const avgFlips = average(recent.map((sample) => sample.flips))
+  const avgResolution = average(recent.map((sample) => sample.resolutionMs))
+  const missRate = recent.length ? (misses / recent.length) * 100 : 0
+
+  const histogram = Array.from(
+    { length: STARTER_STACK.length + 1 },
+    (_, flipCount) => recent.filter((sample) => sample.flips === flipCount).length,
   )
   const histogramMax = Math.max(1, ...histogram)
 
   return (
-    <main className="slam-lab">
-      <section className="slam-lab-sidebar">
-        <div>
-          <p className="eyebrow">DEV / SLAM</p>
-          <h1>Feel first.</h1>
-          <p className="lab-copy">
-            Tune the physical randomizer here. None of these controls are player-facing rules.
-          </p>
-        </div>
-
-        <div className="tuning-grid">
-          <RangeControl
-            label="Impulse"
-            value={tuning.impulseMultiplier}
-            min={0.55}
-            max={1.6}
-            step={0.05}
-            onChange={(value) => set('impulseMultiplier', value)}
-          />
-          <RangeControl
-            label="POG friction"
-            value={tuning.pogFriction}
-            min={0.2}
-            max={1.2}
-            step={0.02}
-            onChange={(value) => set('pogFriction', value)}
-          />
-          <RangeControl
-            label="POG bounce"
-            value={tuning.pogRestitution}
-            min={0}
-            max={0.5}
-            step={0.01}
-            onChange={(value) => set('pogRestitution', value)}
-          />
-          <RangeControl
-            label="Linear damping"
-            value={tuning.pogLinearDamping}
-            min={0}
-            max={1}
-            step={0.02}
-            onChange={(value) => set('pogLinearDamping', value)}
-          />
-          <RangeControl
-            label="Angular damping"
-            value={tuning.pogAngularDamping}
-            min={0}
-            max={1}
-            step={0.02}
-            onChange={(value) => set('pogAngularDamping', value)}
-          />
-          <RangeControl
-            label="Stack gap"
-            value={tuning.stackGap}
-            min={0}
-            max={0.03}
-            step={0.001}
-            onChange={(value) => set('stackGap', value)}
-          />
-          <RangeControl
-            label="Settle ms"
-            value={tuning.settleMs}
-            min={900}
-            max={2600}
-            step={50}
-            onChange={(value) => set('settleMs', value)}
-          />
-          <RangeControl
-            label="Face-up threshold"
-            value={tuning.faceUpThreshold}
-            min={0}
-            max={0.8}
-            step={0.05}
-            onChange={(value) => set('faceUpThreshold', value)}
-          />
-        </div>
-
-        <label className="debug-toggle">
-          <input
-            type="checkbox"
-            checked={debugPhysics}
-            onChange={(event) => setDebugPhysics(event.target.checked)}
-          />
-          Show Rapier colliders
-        </label>
-
-        <section className="slam-telemetry">
-          <div className="telemetry-head">
-            <div>
-              <span>RECENT SLAMS</span>
-              <strong>{recent.length}</strong>
-            </div>
-            <div>
-              <span>AVG FLIPS</span>
-              <strong>{average.toFixed(2)}</strong>
-            </div>
-            <button onClick={() => setResults([])}>CLEAR</button>
+    <>
+      <Leva collapsed={false} oneLineLabels />
+      <main className="slam-lab">
+        <section className="slam-lab-sidebar">
+          <div>
+            <p className="eyebrow">DEV / SLAM</p>
+            <h1>Shot lab.</h1>
+            <p className="lab-copy">
+              Pull, release, measure. Leva owns generic tuning controls; this panel
+              only shows Poglite-specific shot outcomes.
+            </p>
           </div>
-          <div className="flip-histogram">
-            {histogram.map((count, flips) => (
-              <div key={flips} title={flips + ' flips: ' + count}>
-                <span style={{ height: (count / histogramMax) * 100 + '%' }} />
-                <small>{flips}</small>
+
+          <section className="slam-metrics">
+            <div><span>SHOTS</span><strong>{recent.length}</strong></div>
+            <div><span>MISS RATE</span><strong>{missRate.toFixed(0)}%</strong></div>
+            <div><span>AVG PULL</span><strong>{avgPull.toFixed(2)}</strong></div>
+            <div><span>AVG IMPACT</span><strong>{avgImpact.toFixed(2)}</strong></div>
+            <div><span>IMPACT TIME</span><strong>{avgImpactTime.toFixed(0)}ms</strong></div>
+            <div><span>AVG FLIPS</span><strong>{avgFlips.toFixed(2)}</strong></div>
+            <div><span>RESOLUTION</span><strong>{avgResolution.toFixed(0)}ms</strong></div>
+            <button onClick={() => setSamples([])}>CLEAR</button>
+          </section>
+
+          <section className="slam-telemetry">
+            <p className="eyebrow">FLIP DISTRIBUTION / LAST 50</p>
+            <div className="flip-histogram">
+              {histogram.map((count, flips) => (
+                <div key={flips} title={flips + ' flips: ' + count}>
+                  <span style={{ height: (count / histogramMax) * 100 + '%' }} />
+                  <small>{flips}</small>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="recent-shots">
+            <p className="eyebrow">RECENT SHOTS</p>
+            {recent.slice(-8).reverse().map((sample, index) => (
+              <div key={index} className={sample.missed ? 'miss' : ''}>
+                <span>P {sample.pullPower.toFixed(2)}</span>
+                <span>I {sample.impactStrength.toFixed(2)}</span>
+                <span>F {sample.flips}</span>
+                <strong>{sample.missed ? 'MISS' : (sample.timeToImpactMs ?? 0).toFixed(0) + 'ms'}</strong>
               </div>
             ))}
-          </div>
+          </section>
         </section>
-      </section>
 
-      <section className="lab-canvas">
-        <SlamScene
-          pogIds={STARTER_STACK}
-          slammer={slammer}
-          tuning={tuning}
-          debugPhysics={debugPhysics}
-          onResolved={(ids) => setResults((current) => [...current.slice(-39), ids.length])}
-        />
-      </section>
-    </main>
+        <section className="lab-canvas">
+          <SlamScene
+            pogIds={STARTER_STACK}
+            slammer={slammer}
+            tuning={tuning}
+            debugPhysics={controls.debugPhysics}
+            onResolved={() => {}}
+            onShotTelemetry={(sample) =>
+              setSamples((current) => [...current.slice(-99), sample])
+            }
+          />
+        </section>
+      </main>
+    </>
   )
 }

@@ -104,15 +104,18 @@ Correct fit for authored POG, slammer, enemy, pack, and future content validatio
 
 ## Dev tuning UI
 
-### Current small custom Slam Lab controls — KEEP FOR NOW
+### Leva — ADOPTED
 
-The controls are simple and already working.
+Pull/release tuning pushed the Slam Lab past the point where maintaining our own slider/control plumbing made sense. Leva 0.10.1 supports React 19 and now owns the generic dev-control surface.
 
-### Leva — DEFER
+Poglite continues to own only game-specific measurements and telemetry:
+- pull power;
+- impact timing/strength;
+- miss rate;
+- flip distribution;
+- resolution timing.
 
-Leva is purpose-built for React tuning GUIs and should replace custom control plumbing once the number of live parameters grows materially.
-
-**Trigger:** roughly 15+ tuning values, multiple folders/presets, material/light/camera controls, or artists/designers need live tweaking frequently.
+This preserves a clean line between reusable tuning UI and Poglite-specific game instrumentation.
 
 ## Visual scene editing
 
@@ -275,6 +278,7 @@ Do not make an alpha analytics stack a production dependency before we have play
 - pure-rand
 - fast-check
 - Playwright
+- Leva
 
 ### Keep
 - React / TypeScript / Vite
