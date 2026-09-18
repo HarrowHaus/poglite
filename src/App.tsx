@@ -26,6 +26,9 @@ const SlamLab = lazy(() =>
 const SnapSlamLab = lazy(() =>
   import('./dev/SnapSlamLab').then((module) => ({ default: module.SnapSlamLab })),
 )
+const VerticalSlingLab = lazy(() =>
+  import('./dev/VerticalSlingLab').then((module) => ({ default: module.VerticalSlingLab })),
+)
 
 function DevRoute({ children }: { children: ReactNode }) {
   return (
@@ -48,5 +51,6 @@ export function App() {
   if (path === '/dev/combat') return <DevRoute><CombatLab /></DevRoute>
   if (path === '/dev/slam') return <DevRoute><SlamLab /></DevRoute>
   if (path === '/dev/snap') return <DevRoute><SnapSlamLab /></DevRoute>
+  if (path === '/dev/vertical') return <DevRoute><VerticalSlingLab /></DevRoute>
   return <GameShell />
 }
