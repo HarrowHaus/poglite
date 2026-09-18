@@ -236,17 +236,37 @@ Do not add a backend merely because a gacha/collection architecture may eventual
 
 At that point evaluate open-source game backends (including Nakama) before custom API work.
 
+## Balance simulation
+
+### roguelite-core — REJECT AS A DEPENDENCY / HARVEST ARCHITECTURE
+
+The open-source `roguelite-core` project demonstrates a useful pattern: pure deterministic reducers plus a headless batch simulator across thousands of seeds.
+
+Do not import its engine. Its auto-battle, node-map, type/status, evolution, and recruitment mechanics are a different game.
+
+Do copy the architectural idea when Poglite reaches automated balance simulation:
+
+- immutable content snapshot;
+- pure combat/run reducers;
+- seeded simulation;
+- batch runner;
+- aggregate win-rate / damage / reward-choice outputs.
+
+Poglite's physical activation probabilities will be supplied by measured slam distributions rather than importing another game's combat engine.
+
 ## Analytics / balance telemetry
 
 ### Current local dev telemetry — KEEP NOW
 
 The Slam Lab already exposes flip distribution.
 
-### External telemetry — DEFER
+### GamePulse — DEFER / WATCH
 
-Do not add third-party/self-hosted analytics until outside playtesting creates data worth collecting.
+GamePulse is an MIT self-hosted game-specific telemetry project with progression, economy, retention, and balance-oriented analysis, but it is currently early/alpha.
 
-**Trigger:** real playtest cohort. Then evaluate current open-source game telemetry products before building our own ingestion/dashboard stack.
+Do not make an alpha analytics stack a production dependency before we have players.
+
+**Trigger:** meaningful outside playtest cohort. Re-evaluate GamePulse and other current open-source telemetry projects then, before building our own ingestion/dashboard system.
 
 ## Summary
 
