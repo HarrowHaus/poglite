@@ -11,8 +11,22 @@ export interface ScreenPlaneBasis {
   downZ: number
 }
 
+export interface SlamImpulseTuning {
+  horizontalBase: number
+  horizontalPower: number
+  downwardBase: number
+  downwardPower: number
+}
+
 export const MAX_PULL_WORLD = 1.65
 export const MIN_RELEASE_POWER = 0.12
+
+export const DEFAULT_IMPULSE_TUNING: SlamImpulseTuning = {
+  horizontalBase: 1.15,
+  horizontalPower: 0.85,
+  downwardBase: 0.12,
+  downwardPower: 0.15,
+}
 
 export function screenPlaneBasisFromCameraForward(
   forwardX: number,
@@ -31,11 +45,10 @@ export function screenPlaneBasisFromCameraForward(
   const fx = forwardX / length
   const fz = forwardZ / length
 
-  // Camera-space screen right on the horizontal XZ plane.
   const rightX = -fz
   const rightZ = fx
 
-  // Positive screen Y points down, which means toward the camera.
+  // Positive screen Y is down, which maps toward the camera on the table plane.
   const downX = -fx
   const downZ = -fz
 
@@ -85,6 +98,7 @@ export function pullFromScreenMovement(
 export function slammerImpulse(
   pull: PullVector,
   baseImpulse: number,
+  tuning: SlamImpulseTuning = DEFAULT_IMPULSE_TUNING,
 ): { x: number; y: number; z: number } | null {
   const length = Math.hypot(pull.x, pull.z)
   if (pull.power < MIN_RELEASE_POWER || length <= 0.0001) return null
@@ -92,8 +106,12 @@ export function slammerImpulse(
   const nx = -pull.x / length
   const nz = -pull.z / length
 
-  const horizontal = baseImpulse * (1.15 + pull.power * 0.85)
-  const downward = baseImpulse * (0.12 + pull.power * 0.15)
+  const horizontal =
+    baseImpulse *
+    (tuning.horizontalBase + pull.power * tuning.horizontalPower)
+  const downward =
+    baseImpulse *
+    (tuning.downwardBase + pull.power * tuning.downwardPower)
 
   return {
     x: nx * horizontal,
