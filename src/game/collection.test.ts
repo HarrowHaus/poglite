@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
+  ACTIVE_STACK_SIZE,
   applyPullsToCollection,
   initialCollectionEntries,
+  isValidActiveStack,
   ownedPogIds,
 } from './collection'
 import { STARTER_STACK } from './content'
@@ -23,5 +25,15 @@ describe('collection', () => {
     expect(next[target].copies).toBe(3)
     expect(next[target].prints.standard).toBe(1)
     expect(next[target].prints.foil).toBe(2)
+  })
+
+  it('accepts exactly eight unique owned POGs as an active stack', () => {
+    const entries = initialCollectionEntries()
+
+    expect(ACTIVE_STACK_SIZE).toBe(8)
+    expect(isValidActiveStack(STARTER_STACK, entries)).toBe(true)
+    expect(isValidActiveStack(STARTER_STACK.slice(0, 7), entries)).toBe(false)
+    expect(isValidActiveStack([...STARTER_STACK.slice(0, 7), STARTER_STACK[0]], entries)).toBe(false)
+    expect(isValidActiveStack([...STARTER_STACK.slice(0, 7), 'not-owned'], entries)).toBe(false)
   })
 })

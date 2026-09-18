@@ -5,6 +5,8 @@ import type {
   PrintTreatment,
 } from './types'
 
+export const ACTIVE_STACK_SIZE = 8
+
 const emptyPrints = (): Record<PrintTreatment, number> => ({
   standard: 0,
   foil: 0,
@@ -53,4 +55,14 @@ export function ownedPogIds(entries: Record<string, CollectionEntry>): string[] 
   return Object.values(entries)
     .filter((entry) => entry.copies > 0)
     .map((entry) => entry.pogId)
+}
+
+export function isValidActiveStack(
+  pogIds: string[],
+  entries: Record<string, CollectionEntry>,
+): boolean {
+  if (pogIds.length !== ACTIVE_STACK_SIZE) return false
+  if (new Set(pogIds).size !== pogIds.length) return false
+
+  return pogIds.every((pogId) => (entries[pogId]?.copies ?? 0) > 0)
 }

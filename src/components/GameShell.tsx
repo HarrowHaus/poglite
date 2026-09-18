@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { PackReveal } from './PackReveal'
 import { RewardTray } from './RewardTray'
 import { SlamScene } from './SlamScene'
-import { ENEMIES, POGS, STARTER_STACK, pogById } from '../game/content'
+import { ENEMIES, POGS, pogById } from '../game/content'
 import { useCollectionStore } from '../game/collectionStore'
 import { isFinalEncounter } from '../game/run'
 import { useGameStore } from '../game/store'
@@ -37,6 +37,7 @@ export function GameShell() {
 
   const entries = useCollectionStore((state) => state.entries)
   const openPack = useCollectionStore((state) => state.openPack)
+  const activeStack = useCollectionStore((state) => state.activeStack)
   const ownedCount = POGS.filter((pog) => (entries[pog.id]?.copies ?? 0) > 0).length
 
   const enemy = ENEMIES[encounterIndex]
@@ -133,6 +134,10 @@ export function GameShell() {
         </div>
 
         <div className="combat-hud-actions">
+          <a className="binder-shortcut" href="/stack">
+            STACK
+            <strong>{activeStack.length}/8</strong>
+          </a>
           <a className="binder-shortcut" href="/binder">
             BINDER
             <strong>{ownedCount}/{POGS.length}</strong>
@@ -147,7 +152,7 @@ export function GameShell() {
 
       <section className="table-stage">
         <SlamScene
-          pogIds={STARTER_STACK}
+          pogIds={activeStack}
           slammer={slammer}
           disabled={phase !== 'combat' || battle.won || battle.lost}
           onResolved={handleResolved}
