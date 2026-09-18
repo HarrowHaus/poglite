@@ -59,3 +59,28 @@ test('binder route renders from the production base', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'The Binder' })).toBeVisible()
   await expect(page.getByText(/8\/20 POGs/)).toBeVisible()
 })
+
+
+test('pull-and-release gesture resolves a turn in the production camera', async ({ page }) => {
+  await loadAndAssertRuntime(page, './')
+
+  const canvas = page.locator('canvas')
+  const box = await canvas.boundingBox()
+  if (!box) throw new Error('Canvas has no bounding box')
+
+  // Projection of the known slammer anchor (0, 1.35, 1.8) for the current
+  // 34° camera at (0, 7.41, 8.19), looking at (0, 0.12, 0).
+  // We start near the visual slammer center and pull screen-down (toward camera),
+  // so the slingshot release launches toward the POG stack.
+  const startX = box.x + box.width * 0.5
+  const startY = box.y + box.height * 0.63
+
+  await page.mouse.move(startX, startY)
+  await page.mouse.down()
+  await page.mouse.move(startX, startY + box.height * 0.13, { steps: 12 })
+  await page.mouse.up()
+
+  await expect(page.locator('.player-status div').nth(2).locator('strong')).toHaveText('2', {
+    timeout: 5_000,
+  })
+})
