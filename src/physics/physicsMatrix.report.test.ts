@@ -12,18 +12,11 @@ interface Profile {
   capRestitution: number
   tableRestitution: number
   slammerRestitution: number
+  capMass: number
+  impulseScale: number
 }
 
 const profiles: Profile[] = [
-  {
-    name: 'flat-dead',
-    baseTilt: 0,
-    extraTilt: 0,
-    spinScale: 0,
-    capRestitution: 0.03,
-    tableRestitution: 0,
-    slammerRestitution: 0.09,
-  },
   {
     name: 'tilt-spin-dead',
     baseTilt: 0.13,
@@ -32,33 +25,8 @@ const profiles: Profile[] = [
     capRestitution: 0.03,
     tableRestitution: 0,
     slammerRestitution: 0.09,
-  },
-  {
-    name: 'flat-rebound',
-    baseTilt: 0,
-    extraTilt: 0,
-    spinScale: 0,
-    capRestitution: 0.12,
-    tableRestitution: 0.22,
-    slammerRestitution: 0.15,
-  },
-  {
-    name: 'tilt-no-spin-rebound',
-    baseTilt: 0.13,
-    extraTilt: 0.16,
-    spinScale: 0,
-    capRestitution: 0.12,
-    tableRestitution: 0.22,
-    slammerRestitution: 0.15,
-  },
-  {
-    name: 'tilt-spin-rebound',
-    baseTilt: 0.13,
-    extraTilt: 0.16,
-    spinScale: 1,
-    capRestitution: 0.12,
-    tableRestitution: 0.22,
-    slammerRestitution: 0.15,
+    capMass: 0.08,
+    impulseScale: 1,
   },
   {
     name: 'tilt-spin-lively',
@@ -68,6 +36,41 @@ const profiles: Profile[] = [
     capRestitution: 0.22,
     tableRestitution: 0.35,
     slammerRestitution: 0.22,
+    capMass: 0.08,
+    impulseScale: 1,
+  },
+  {
+    name: 'steep-tilt',
+    baseTilt: 0.28,
+    extraTilt: 0.28,
+    spinScale: 1,
+    capRestitution: 0.18,
+    tableRestitution: 0.30,
+    slammerRestitution: 0.20,
+    capMass: 0.08,
+    impulseScale: 1,
+  },
+  {
+    name: 'heavy-hit',
+    baseTilt: 0.28,
+    extraTilt: 0.28,
+    spinScale: 1.1,
+    capRestitution: 0.20,
+    tableRestitution: 0.34,
+    slammerRestitution: 0.22,
+    capMass: 0.04,
+    impulseScale: 1.5,
+  },
+  {
+    name: 'extreme-rigid',
+    baseTilt: 0.40,
+    extraTilt: 0.30,
+    spinScale: 1.3,
+    capRestitution: 0.24,
+    tableRestitution: 0.40,
+    slammerRestitution: 0.28,
+    capMass: 0.025,
+    impulseScale: 2,
   },
 ]
 
@@ -158,6 +161,8 @@ reportIt(
                   capRestitution: profile.capRestitution,
                   tableRestitution: profile.tableRestitution,
                   slammerRestitution: profile.slammerRestitution,
+                  capMass: profile.capMass,
+                  impulseScale: profile.impulseScale,
                 }),
               )
             }
