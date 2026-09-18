@@ -16,6 +16,13 @@ export interface SlamTuning {
   impulseMultiplier: number
   settleMs: number
   faceUpThreshold: number
+  maxPullWorld: number
+  horizontalImpulseBase: number
+  horizontalImpulsePower: number
+  downwardImpulseBase: number
+  downwardImpulsePower: number
+  slammerAnchorY: number
+  slammerAnchorZ: number
 }
 
 export const DEFAULT_SLAM_TUNING: SlamTuning = {
@@ -29,6 +36,13 @@ export const DEFAULT_SLAM_TUNING: SlamTuning = {
   impulseMultiplier: 1,
   settleMs: 1650,
   faceUpThreshold: 0.25,
+  maxPullWorld: 1.65,
+  horizontalImpulseBase: 1.15,
+  horizontalImpulsePower: 0.85,
+  downwardImpulseBase: 0.12,
+  downwardImpulsePower: 0.15,
+  slammerAnchorY: 1.35,
+  slammerAnchorZ: 1.8,
 }
 
 export function capUpDot(rotation: RotationLike): number {
