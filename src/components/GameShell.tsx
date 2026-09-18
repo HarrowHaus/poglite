@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
+import { RewardTray } from './RewardTray'
 import { SlamScene } from './SlamScene'
 import { ENEMIES, STARTER_STACK, pogById } from '../game/content'
+import { isFinalEncounter } from '../game/run'
 import { useGameStore } from '../game/store'
 import { emitFeedback, onFeedback } from '../presentation/events'
 
@@ -14,8 +16,20 @@ function Meter({ value, max }: { value: number; max: number }) {
 }
 
 export function GameShell() {
-  const { battle, slammer, lastResolution, resolve, reset } = useGameStore()
-  const enemy = ENEMIES[0]
+  const {
+    battle,
+    encounterIndex,
+    phase,
+    rewards,
+    slammer,
+    lastResolution,
+    resolve,
+    openReward,
+    chooseReward,
+    restartRun,
+  } = useGameStore()
+
+  const enemy = ENEMIES[encounterIndex]
   const [impact, setImpact] = useState({ id: 0, strength: 0 })
   const [enemyHit, setEnemyHit] = useState({ id: 0, amount: 0 })
   const [playerHit, setPlayerHit] = useState({ id: 0, amount: 0 })
@@ -66,24 +80,43 @@ export function GameShell() {
     }
   }
 
-  const handleReset = () => {
+  const handleOpenReward = () => {
     setShowActivations(false)
-    reset()
+    openReward()
   }
 
+  const handleChooseReward = (instanceId: string) => {
+    setShowActivations(false)
+    setEnemyHit((current) => ({ id: current.id, amount: 0 }))
+    setPlayerHit((current) => ({ id: current.id, amount: 0 }))
+    chooseReward(instanceId)
+  }
+
+  const handleRestart = () => {
+    setShowActivations(false)
+    setEnemyHit({ id: 0, amount: 0 })
+    setPlayerHit({ id: 0, amount: 0 })
+    restartRun()
+  }
+
+  const encounterLabel = String(encounterIndex + 1).padStart(2, '0')
+  const finalEncounter = isFinalEncounter(encounterIndex)
+
   return (
-    <main className={'game-shell' + (playerHit.amount > 0 ? ' has-player-hit' : '')}>
+    <main className="game-shell">
       <header className="combat-hud">
         <div>
-          <p className="eyebrow">ENCOUNTER 01</p>
+          <p className="eyebrow">
+            ENCOUNTER {encounterLabel} / {String(ENEMIES.length).padStart(2, '0')}
+          </p>
           <h1>{enemy.name}</h1>
           <Meter value={battle.enemyHp} max={battle.enemyMaxHp} />
           <p className="hud-number">{battle.enemyHp} / {battle.enemyMaxHp} HP</p>
         </div>
         <div className="intent">
-          <span>NEXT</span>
-          <strong>{enemy.attack}</strong>
-          <small>DAMAGE</small>
+          <span>{battle.won ? 'DOWN' : 'NEXT'}</span>
+          <strong>{battle.won ? '—' : enemy.attack}</strong>
+          <small>{battle.won ? 'CLEARED' : 'DAMAGE'}</small>
         </div>
       </header>
 
@@ -91,11 +124,11 @@ export function GameShell() {
         <SlamScene
           pogIds={STARTER_STACK}
           slammer={slammer}
-          disabled={battle.won || battle.lost}
+          disabled={phase !== 'combat' || battle.won || battle.lost}
           onResolved={handleResolved}
         />
 
-        {impact.id > 0 && (
+        {impact.id > 0 && phase === 'combat' && (
           <div
             key={'impact-' + impact.id}
             className="impact-flash"
@@ -103,19 +136,19 @@ export function GameShell() {
           />
         )}
 
-        {enemyHit.id > 0 && (
+        {enemyHit.amount > 0 && phase === 'combat' && (
           <div key={'enemy-' + enemyHit.id} className="damage-pop enemy-damage">
             -{enemyHit.amount}
           </div>
         )}
 
-        {playerHit.id > 0 && (
+        {playerHit.amount > 0 && phase === 'combat' && (
           <div key={'player-' + playerHit.id} className="damage-pop player-damage">
             -{playerHit.amount} HP
           </div>
         )}
 
-        {showActivations && lastResolution && (
+        {showActivations && lastResolution && phase === 'combat' && (
           <div className="activation-readout" aria-live="polite">
             <div className="activation-summary">
               <strong>{lastResolution.totalDamage}</strong>
@@ -136,12 +169,29 @@ export function GameShell() {
           </div>
         )}
 
+        {phase === 'reward' && (
+          <RewardTray rewards={rewards} onChoose={handleChooseReward} />
+        )}
+
+        {phase === 'complete' && (
+          <div className="run-complete-overlay">
+            <p className="eyebrow">RUN COMPLETE</p>
+            <h2>Five fights. Still standing.</h2>
+            <p>The run cadence works without adding a map or another control scheme.</p>
+            <button onClick={handleRestart}>RUN IT AGAIN</button>
+          </div>
+        )}
+
         <div className="slam-instruction">
-          {battle.won
-            ? 'ENCOUNTER CLEARED'
-            : battle.lost
-              ? 'RUN ENDED'
-              : 'MOVE TO AIM · TAP TABLE TO SLAM'}
+          {phase === 'reward'
+            ? 'CHOOSE ONE'
+            : phase === 'complete'
+              ? 'RUN COMPLETE'
+              : battle.won
+                ? finalEncounter ? 'FINAL ENCOUNTER CLEARED' : 'REWARD READY'
+                : battle.lost
+                  ? 'RUN ENDED'
+                  : 'MOVE TO AIM · TAP TABLE TO SLAM'}
         </div>
       </section>
 
@@ -161,7 +211,7 @@ export function GameShell() {
           <div><span>TURN</span><strong>{battle.turn}</strong></div>
         </div>
 
-        {lastResolution && (
+        {lastResolution && phase === 'combat' && (
           <div className="resolution-strip">
             <span>{lastResolution.flippedPogIds.length} FLIPPED</span>
             <strong>{lastResolution.totalDamage} DAMAGE</strong>
@@ -169,9 +219,15 @@ export function GameShell() {
           </div>
         )}
 
-        {(battle.won || battle.lost) && (
-          <button className="reset-button" onClick={handleReset}>
-            {battle.won ? 'RUN IT BACK' : 'TRY AGAIN'}
+        {phase === 'combat' && battle.won && (
+          <button className="reset-button" onClick={handleOpenReward}>
+            {finalEncounter ? 'FINISH RUN' : 'OPEN REWARD'}
+          </button>
+        )}
+
+        {phase === 'combat' && battle.lost && (
+          <button className="reset-button danger" onClick={handleRestart}>
+            RESTART RUN
           </button>
         )}
       </footer>

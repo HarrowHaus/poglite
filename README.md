@@ -16,6 +16,7 @@ Browser-first collectible physics roguelite built around one tactile action: **s
 - face-up detection feeds a pure combat resolver;
 - HP / Power / Guard only;
 - seeded slammer family + level + rarity + affix generation;
+- five-fight run cadence with a three-slammer reward choice between encounters;
 - authored POG definitions validated with Zod;
 - domain tests for combat and loot;
 - visual developer lenses for slam feel, combat math, and 100-roll loot inspection.
