@@ -99,6 +99,6 @@ test('vertical slingshot experiment route loads', async ({ page }) => {
   await loadAndAssertRuntime(page, './dev/vertical')
 
   await expect(page).toHaveURL(/\/poglite\/dev\/vertical$/)
-  await expect(page.getByRole('heading', { name: 'Angry Birds, but down.' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '41 mm POG physics.' })).toBeVisible()
   await expect(page.locator('canvas')).toBeVisible()
 })
