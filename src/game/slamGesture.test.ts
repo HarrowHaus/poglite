@@ -46,6 +46,27 @@ describe('pull-and-release slam gesture', () => {
     expect(impulse!.y).toBeLessThan(0)
   })
 
+  it('responds predictably to a tuned launch envelope', () => {
+    const pull = { x: 0, z: 1, power: 0.75 }
+    const soft = slammerImpulse(pull, 8, {
+      horizontalBase: 0.5,
+      horizontalPower: 0.5,
+      downwardBase: 0.05,
+      downwardPower: 0.05,
+    })
+    const hard = slammerImpulse(pull, 8, {
+      horizontalBase: 1.5,
+      horizontalPower: 1,
+      downwardBase: 0.2,
+      downwardPower: 0.2,
+    })
+
+    expect(soft).not.toBeNull()
+    expect(hard).not.toBeNull()
+    expect(Math.hypot(hard!.x, hard!.z)).toBeGreaterThan(Math.hypot(soft!.x, soft!.z))
+    expect(Math.abs(hard!.y)).toBeGreaterThan(Math.abs(soft!.y))
+  })
+
   it('ignores tiny accidental releases', () => {
     expect(slammerImpulse({ x: 0.02, z: 0.02, power: 0.02 }, 8)).toBeNull()
   })
