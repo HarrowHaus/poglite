@@ -4,13 +4,6 @@ export interface PullVector {
   power: number
 }
 
-export interface ScreenPlaneBasis {
-  rightX: number
-  rightZ: number
-  downX: number
-  downZ: number
-}
-
 export interface SlamImpulseTuning {
   horizontalBase: number
   horizontalPower: number
@@ -28,56 +21,13 @@ export const DEFAULT_IMPULSE_TUNING: SlamImpulseTuning = {
   downwardPower: 0.15,
 }
 
-export function screenPlaneBasisFromCameraForward(
-  forwardX: number,
-  forwardZ: number,
-): ScreenPlaneBasis {
-  const length = Math.hypot(forwardX, forwardZ)
-  if (length <= 0.000001) {
-    return {
-      rightX: 1,
-      rightZ: 0,
-      downX: 0,
-      downZ: 1,
-    }
-  }
-
-  const fx = forwardX / length
-  const fz = forwardZ / length
-
-  const rightX = -fz
-  const rightZ = fx
-
-  // Positive screen Y is down, which maps toward the camera on the table plane.
-  const downX = -fx
-  const downZ = -fz
-
-  return {
-    rightX,
-    rightZ,
-    downX,
-    downZ,
-  }
-}
-
-export function pullFromScreenMovement(
-  movementX: number,
-  movementY: number,
-  unitsPerPixelX: number,
-  unitsPerPixelY: number,
-  basis: ScreenPlaneBasis,
+export function pullFromWorldDelta(
+  deltaX: number,
+  deltaZ: number,
   maxPull = MAX_PULL_WORLD,
 ): PullVector {
-  const horizontalPull = movementX * unitsPerPixelX
-  const verticalPull = movementY * unitsPerPixelY
-
-  let x =
-    basis.rightX * horizontalPull +
-    basis.downX * verticalPull
-  let z =
-    basis.rightZ * horizontalPull +
-    basis.downZ * verticalPull
-
+  let x = deltaX
+  let z = deltaZ
   const length = Math.hypot(x, z)
 
   if (length > maxPull) {

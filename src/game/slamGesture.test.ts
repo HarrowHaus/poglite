@@ -1,42 +1,21 @@
+import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 import {
   MAX_PULL_WORLD,
-  pullFromScreenMovement,
-  screenPlaneBasisFromCameraForward,
+  pullFromWorldDelta,
   slammerImpulse,
 } from './slamGesture'
 
 describe('pull-and-release slam gesture', () => {
-  it('maps screen-down to world-space toward the camera', () => {
-    const basis = screenPlaneBasisFromCameraForward(0, -1)
-    const pull = pullFromScreenMovement(0, 100, 0.01, 0.01, basis)
-
-    expect(pull.x).toBeCloseTo(0, 5)
-    expect(pull.z).toBeGreaterThan(0)
-  })
-
-  it('rotates drag controls with the camera instead of world axes', () => {
-    const basis = screenPlaneBasisFromCameraForward(-1, 0)
-    const screenRight = pullFromScreenMovement(100, 0, 0.01, 0.01, basis)
-    const screenDown = pullFromScreenMovement(0, 100, 0.01, 0.01, basis)
-
-    expect(screenRight.z).toBeLessThan(0)
-    expect(Math.abs(screenRight.x)).toBeLessThan(0.00001)
-
-    expect(screenDown.x).toBeGreaterThan(0)
-    expect(Math.abs(screenDown.z)).toBeLessThan(0.00001)
-  })
-
-  it('clamps pull distance while preserving direction', () => {
-    const basis = screenPlaneBasisFromCameraForward(0, -1)
-    const pull = pullFromScreenMovement(1000, 1000, 0.01, 0.01, basis)
+  it('clamps exact world-space pull distance while preserving direction', () => {
+    const pull = pullFromWorldDelta(10, 10)
 
     expect(Math.hypot(pull.x, pull.z)).toBeCloseTo(MAX_PULL_WORLD, 5)
     expect(pull.power).toBe(1)
     expect(pull.x).toBeCloseTo(pull.z, 5)
   })
 
-  it('launches opposite the camera-correct pull like a slingshot', () => {
+  it('launches opposite the world-space pull like a slingshot', () => {
     const pull = { x: -0.5, z: 1, power: 0.7 }
     const impulse = slammerImpulse(pull, 8)
 
@@ -69,5 +48,21 @@ describe('pull-and-release slam gesture', () => {
 
   it('ignores tiny accidental releases', () => {
     expect(slammerImpulse({ x: 0.02, z: 0.02, power: 0.02 }, 8)).toBeNull()
+  })
+
+  it('never returns pull power outside zero-to-one', () => {
+    fc.assert(
+      fc.property(
+        fc.double({ min: -100, max: 100, noNaN: true }),
+        fc.double({ min: -100, max: 100, noNaN: true }),
+        (x, z) => {
+          const pull = pullFromWorldDelta(x, z)
+          expect(pull.power).toBeGreaterThanOrEqual(0)
+          expect(pull.power).toBeLessThanOrEqual(1)
+          expect(Math.hypot(pull.x, pull.z)).toBeLessThanOrEqual(MAX_PULL_WORLD + 1e-9)
+        },
+      ),
+      { numRuns: 150 },
+    )
   })
 })

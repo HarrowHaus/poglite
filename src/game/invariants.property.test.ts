@@ -5,8 +5,7 @@ import { rollSlammer } from './loot'
 import { rollPack } from './packs'
 import { seededRng } from './rng'
 import {
-  pullFromScreenMovement,
-  screenPlaneBasisFromCameraForward,
+  pullFromWorldDelta,
   slammerImpulse,
 } from './slamGesture'
 
@@ -90,34 +89,13 @@ describe('generated game invariants', () => {
     )
   })
 
-  it('camera-relative pull basis stays orthonormal for any horizontal camera angle', () => {
+  it('world-space slingshot impulse always opposes the pull direction', () => {
     fc.assert(
       fc.property(
         fc.double({ min: -100, max: 100, noNaN: true }),
         fc.double({ min: -100, max: 100, noNaN: true }),
-        fc.integer({ min: -2000, max: 2000 }),
-        fc.integer({ min: -2000, max: 2000 }),
-        (forwardX, forwardZ, movementX, movementY) => {
-          fc.pre(Math.hypot(forwardX, forwardZ) > 0.001)
-
-          const basis = screenPlaneBasisFromCameraForward(forwardX, forwardZ)
-          const rightLength = Math.hypot(basis.rightX, basis.rightZ)
-          const downLength = Math.hypot(basis.downX, basis.downZ)
-          const dot =
-            basis.rightX * basis.downX +
-            basis.rightZ * basis.downZ
-
-          expect(rightLength).toBeCloseTo(1, 8)
-          expect(downLength).toBeCloseTo(1, 8)
-          expect(dot).toBeCloseTo(0, 8)
-
-          const pull = pullFromScreenMovement(
-            movementX,
-            movementY,
-            0.01,
-            0.01,
-            basis,
-          )
+        (deltaX, deltaZ) => {
+          const pull = pullFromWorldDelta(deltaX, deltaZ)
 
           expect(pull.power).toBeGreaterThanOrEqual(0)
           expect(pull.power).toBeLessThanOrEqual(1)
