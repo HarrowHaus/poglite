@@ -2,24 +2,24 @@ import { Canvas, type ThreeEvent, useFrame } from '@react-three/fiber'
 import { Physics, RigidBody, type RapierRigidBody } from '@react-three/rapier'
 import { useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react'
 import { pogById, slammerFamilyById } from '../game/content'
+import {
+  DEFAULT_SLAM_TUNING,
+  isFaceUpRotation,
+  type SlamTuning,
+} from '../game/slamPhysics'
 import type { GeneratedSlammer } from '../game/types'
 
 interface SlamSceneProps {
   pogIds: string[]
   slammer: GeneratedSlammer
-  slamImpulseScale?: number
+  tuning?: Partial<SlamTuning>
+  debugPhysics?: boolean
   disabled?: boolean
   onResolved: (flippedPogIds: string[]) => void
 }
 
 const POG_RADIUS = 0.58
 const POG_THICKNESS = 0.07
-
-function isFaceUp(body: RapierRigidBody): boolean {
-  const q = body.rotation()
-  const upDot = 1 - 2 * (q.x * q.x + q.z * q.z)
-  return upDot > 0.25
-}
 
 function Table() {
   return (
@@ -35,14 +35,17 @@ function Table() {
 function PogStack({
   ids,
   bodies,
+  tuning,
 }: {
   ids: string[]
   bodies: MutableRefObject<Array<RapierRigidBody | null>>
+  tuning: SlamTuning
 }) {
   return (
     <>
       {ids.map((id, index) => {
         const pog = pogById(id)
+        const spacing = POG_THICKNESS + tuning.stackGap
         return (
           <RigidBody
             key={id}
@@ -50,11 +53,11 @@ function PogStack({
               bodies.current[index] = body
             }}
             colliders="hull"
-            friction={0.78}
-            restitution={0.08}
-            linearDamping={0.28}
-            angularDamping={0.26}
-            position={[0, 0.04 + index * 0.075, 0]}
+            friction={tuning.pogFriction}
+            restitution={tuning.pogRestitution}
+            linearDamping={tuning.pogLinearDamping}
+            angularDamping={tuning.pogAngularDamping}
+            position={[0, 0.04 + index * spacing, 0]}
             rotation={[Math.PI, 0, index * 0.09]}
           >
             <mesh castShadow receiveShadow>
@@ -75,10 +78,14 @@ function PogStack({
 function Playfield({
   pogIds,
   slammer,
-  slamImpulseScale = 1,
+  tuning: tuningOverrides,
   disabled = false,
   onResolved,
 }: SlamSceneProps) {
+  const tuning = useMemo(
+    () => ({ ...DEFAULT_SLAM_TUNING, ...tuningOverrides }),
+    [tuningOverrides],
+  )
   const family = slammerFamilyById(slammer.familyId)
   const slammerBody = useRef<RapierRigidBody>(null)
   const pogBodies = useRef<Array<RapierRigidBody | null>>([])
@@ -87,10 +94,10 @@ function Playfield({
   const settleTimer = useRef<number | undefined>(undefined)
   const resetTimer = useRef<number | undefined>(undefined)
 
-  const restPositions = useMemo(
-    () => pogIds.map((_, index) => ({ x: 0, y: 0.04 + index * 0.075, z: 0 })),
-    [pogIds],
-  )
+  const restPositions = useMemo(() => {
+    const spacing = POG_THICKNESS + tuning.stackGap
+    return pogIds.map((_, index) => ({ x: 0, y: 0.04 + index * spacing, z: 0 }))
+  }, [pogIds, tuning.stackGap])
 
   useEffect(
     () => () => {
@@ -123,7 +130,11 @@ function Playfield({
     setPhase('slamming')
     slammerBody.current.setLinvel({ x: 0, y: 0, z: 0 }, true)
     slammerBody.current.applyImpulse(
-      { x: 0, y: -family.physics.slamImpulse * slamImpulseScale, z: 0 },
+      {
+        x: 0,
+        y: -family.physics.slamImpulse * tuning.impulseMultiplier,
+        z: 0,
+      },
       true,
     )
     slammerBody.current.applyTorqueImpulse({ x: 0.08, y: 0.15, z: -0.06 }, true)
@@ -131,11 +142,13 @@ function Playfield({
     settleTimer.current = window.setTimeout(() => {
       setPhase('resolving')
       const flipped = pogBodies.current.flatMap((body, index) =>
-        body && isFaceUp(body) ? [pogIds[index]] : [],
+        body && isFaceUpRotation(body.rotation(), tuning.faceUpThreshold)
+          ? [pogIds[index]]
+          : [],
       )
       onResolved(flipped)
       resetTimer.current = window.setTimeout(resetStack, 850)
-    }, 1650)
+    }, tuning.settleMs)
   }
 
   const aimFromPointer = (event: ThreeEvent<PointerEvent>) => {
@@ -151,13 +164,13 @@ function Playfield({
       <ambientLight intensity={1.2} />
       <directionalLight position={[3, 7, 4]} intensity={3.4} castShadow />
       <Table />
-      <PogStack ids={pogIds} bodies={pogBodies} />
+      <PogStack ids={pogIds} bodies={pogBodies} tuning={tuning} />
 
       <RigidBody
         ref={slammerBody}
         colliders="hull"
-        friction={0.72}
-        restitution={0.08}
+        friction={tuning.slammerFriction}
+        restitution={tuning.slammerRestitution}
         linearDamping={0.22}
         angularDamping={0.18}
         position={[aim.x, 2.25, aim.z]}
@@ -191,12 +204,12 @@ function Playfield({
   )
 }
 
-export function SlamScene(props: SlamSceneProps) {
+export function SlamScene({ debugPhysics = false, ...props }: SlamSceneProps) {
   return (
     <Canvas shadows camera={{ position: [0, 5.7, 6.3], fov: 34 }} dpr={[1, 1.75]}>
       <color attach="background" args={['#11100f']} />
       <fog attach="fog" args={['#11100f', 7, 14]} />
-      <Physics gravity={[0, -9.81, 0]} timeStep={1 / 60}>
+      <Physics debug={debugPhysics} gravity={[0, -9.81, 0]} timeStep={1 / 60}>
         <Playfield {...props} />
       </Physics>
     </Canvas>
