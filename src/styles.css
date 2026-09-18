@@ -1126,3 +1126,55 @@ h2 { margin-bottom: 4px; }
   .foundry-current { flex-direction: column; align-items: stretch; }
   .foundry-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+
+/* Shot lab metrics — controls themselves are provided by open-source Leva. */
+.slam-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  margin-top: 16px;
+}
+.slam-metrics > div {
+  padding: 9px;
+  border: 1px solid #302b26;
+  background: #0d0c0a;
+}
+.slam-metrics span {
+  display: block;
+  color: #817970;
+  font: 800 7px/1 ui-monospace, monospace;
+  letter-spacing: .1em;
+}
+.slam-metrics strong {
+  display: block;
+  margin-top: 4px;
+  color: #f3efe6;
+  font: 900 19px/1 ui-monospace, monospace;
+}
+.slam-metrics button {
+  grid-column: 1 / -1;
+  border: 1px solid #423b33;
+  background: transparent;
+  color: #aaa196;
+  padding: 8px;
+  font: 900 8px/1 ui-monospace, monospace;
+  letter-spacing: .1em;
+  cursor: pointer;
+}
+.recent-shots {
+  margin-top: 16px;
+  border-top: 1px solid #302b26;
+  padding-top: 12px;
+}
+.recent-shots > div {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr) auto;
+  gap: 5px;
+  padding: 5px 0;
+  border-bottom: 1px solid #25211d;
+  color: #938b81;
+  font: 700 8px/1 ui-monospace, monospace;
+}
+.recent-shots > div strong { color: #73e2c5; }
+.recent-shots > div.miss strong { color: #ff765f; }
