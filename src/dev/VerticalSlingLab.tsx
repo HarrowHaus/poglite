@@ -10,114 +10,123 @@ import {
   type RapierRigidBody,
 } from '@react-three/rapier'
 import { Vector3 } from 'three'
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { PogFace } from '../components/PogFace'
-import { STARTER_STACK, pogById, slammerFamilyById } from '../game/content'
+import { STARTER_STACK, pogById } from '../game/content'
 import { rollSlammer } from '../game/loot'
 import { isFaceUpRotation } from '../game/slamPhysics'
 import {
   constrainVerticalPull,
   predictBallisticPath,
   predictImpactPoint,
-  verticalSlamImpulse,
-  verticalSlamOrientation,
-  verticalSlamYawSpin,
   type VerticalSlingPull,
 } from '../game/verticalSling'
 import { appHref } from '../navigation'
+import {
+  launchFromRealScalePull,
+  REAL_POG,
+  REAL_PULL,
+  REAL_WORLD,
+  realSlammerProfile,
+} from '../physics/pogPhysicalProfile'
 import { projectClientPointToPlane } from '../presentation/pointerProjection'
 
-const POG_RADIUS = 0.58
-const POG_THICKNESS = 0.045
-const POG_EDGE_RADIUS = 0.006
-const POG_MASS = 0.08
-const STACK_SPACING = 0.046
-const CAP_FRICTION = 0.18
-const TABLE_FRICTION = 0.30
-const SLAMMER_FRICTION = 0.95
-const BASE_TILT_RADIANS = 0.13
-const EXTRA_TILT_RADIANS = 0.16
-const FACE_UP_THRESHOLD = 0.72
-
-const ANCHOR = { x: 0, y: 1.35, z: 0 }
-const EMPTY_PULL: VerticalSlingPull = { x: 0, y: 0, z: 0, power: 0 }
-const MIN_SETTLE_AFTER_IMPACT_MS = 220
-const MAX_RESOLVE_MS = 980
+const POG_COUNT = STARTER_STACK.length
+const STACK_SPACING = REAL_POG.thicknessCm + REAL_POG.stackGapCm
+const STACK_BASE_Y = REAL_POG.thicknessCm / 2 + 0.002
 const STACK_TOP_Y =
-  0.04 + (STARTER_STACK.length - 1) * STACK_SPACING + POG_THICKNESS
+  STACK_BASE_Y +
+  (POG_COUNT - 1) * STACK_SPACING +
+  REAL_POG.thicknessCm / 2
 
-function stackOffset(index: number) {
-  return {
-    x: ((index % 3) - 1) * 0.004,
-    z: (((index * 2) % 3) - 1) * 0.004,
-  }
+const ANCHOR = { x: 0, y: STACK_TOP_Y + 3.5, z: 0 }
+const PULL_CONFIG = {
+  maxVerticalPull: REAL_PULL.maxVerticalPullCm,
+  lateralRatio: REAL_PULL.lateralRatio,
+  minVerticalPull: REAL_PULL.minVerticalPullCm,
 }
+
+const EMPTY_PULL: VerticalSlingPull = { x: 0, y: 0, z: 0, power: 0 }
+const MAX_RESOLVE_MS = 1250
 
 function vecLength(v: { x: number; y: number; z: number }) {
   return Math.hypot(v.x, v.y, v.z)
 }
 
+function stackOffset(index: number) {
+  return {
+    x: (((index * 37) % 5) - 2) * 0.008,
+    z: (((index * 53) % 5) - 2) * 0.008,
+  }
+}
+
+function CameraRig() {
+  const { camera } = useThree()
+
+  useEffect(() => {
+    camera.lookAt(0, 0.65, 0)
+    camera.updateMatrixWorld()
+  }, [camera])
+
+  return null
+}
+
 function TrajectoryPreview({
   pull,
-  familyMass,
-  baseImpulse,
+  familyId,
 }: {
   pull: VerticalSlingPull
-  familyMass: number
-  baseImpulse: number
+  familyId: string
 }) {
-  const impulse = verticalSlamImpulse(pull, baseImpulse)
-  if (!impulse) return null
+  if (pull.power <= 0.02) return null
 
+  const launch = launchFromRealScalePull(pull)
+  const profile = realSlammerProfile(familyId)
   const start = {
     x: ANCHOR.x + pull.x,
     y: ANCHOR.y + pull.y,
     z: ANCHOR.z + pull.z,
   }
-  const velocity = {
-    x: impulse.x / familyMass,
-    y: impulse.y / familyMass,
-    z: impulse.z / familyMass,
-  }
 
   const points = predictBallisticPath(
     start,
-    velocity,
-    -9.81,
-    STACK_TOP_Y,
-    0.04,
-    0.7,
+    launch.velocityCmPerSec,
+    REAL_WORLD.gravityCmPerSec2,
+    STACK_TOP_Y + profile.thicknessCm / 2,
+    0.012,
+    0.32,
   )
+
   const impact = predictImpactPoint(
     start,
-    velocity,
-    -9.81,
-    STACK_TOP_Y,
+    launch.velocityCmPerSec,
+    REAL_WORLD.gravityCmPerSec2,
+    STACK_TOP_Y + profile.thicknessCm / 2,
   )
 
   return (
     <>
       {points.slice(1).map((point, index) => (
         <mesh key={index} position={[point.x, point.y, point.z]}>
-          <sphereGeometry args={[0.026, 8, 8]} />
+          <sphereGeometry args={[0.09, 8, 8]} />
           <meshBasicMaterial
             color="#f3ff72"
             transparent
-            opacity={Math.max(0.18, 0.8 - index * 0.055)}
+            opacity={Math.max(0.16, 0.75 - index * 0.045)}
           />
         </mesh>
       ))}
 
       {impact && (
         <mesh
-          position={[impact.x, STACK_TOP_Y + 0.008, impact.z]}
+          position={[impact.x, 0.018, impact.z]}
           rotation={[-Math.PI / 2, 0, 0]}
         >
-          <ringGeometry args={[0.16, 0.22, 28]} />
+          <ringGeometry args={[0.38, 0.52, 32]} />
           <meshBasicMaterial
             color={pull.power > 0.82 ? '#ff765f' : '#73e2c5'}
             transparent
-            opacity={0.82}
+            opacity={0.85}
           />
         </mesh>
       )}
@@ -125,22 +134,23 @@ function TrajectoryPreview({
   )
 }
 
+interface Result {
+  flips: string[]
+  speedMps: number
+  lateralFraction: number
+  releaseToImpactMs: number | null
+  releaseToResolveMs: number
+  scatterRadiusCm: number
+}
+
 function VerticalSlingScene({
   onResult,
 }: {
-  onResult: (result: {
-    flips: string[]
-    releaseToImpactMs: number | null
-    releaseToResolveMs: number
-    contactEccentricity: number | null
-    contactNormalTiltDeg: number | null
-    peakContactForce: number
-  }) => void
+  onResult: (result: Result) => void
 }) {
   const { camera, gl } = useThree()
-  const slammer = useMemo(() => rollSlammer('vertical-sling-lab', 4), [])
-  const family = slammerFamilyById(slammer.familyId)
-  const physicalSlammerThickness = family.physics.thickness * 1.55
+  const slammer = useMemo(() => rollSlammer('vertical-real-scale', 4), [])
+  const profile = realSlammerProfile(slammer.familyId)
 
   const slammerBody = useRef<RapierRigidBody>(null)
   const pogBodies = useRef<Array<RapierRigidBody | null>>([])
@@ -150,9 +160,7 @@ function VerticalSlingScene({
   const releasedAt = useRef<number | null>(null)
   const impactAt = useRef<number | null>(null)
   const stableFrames = useRef(0)
-  const impactPoint = useRef<{ x: number; y: number; z: number } | null>(null)
-  const impactNormal = useRef<{ x: number; y: number; z: number } | null>(null)
-  const peakContactForce = useRef(0)
+  const activeLaunch = useRef<ReturnType<typeof launchFromRealScalePull> | null>(null)
 
   const [phase, setPhase] = useState<'ready' | 'flight' | 'result'>('ready')
   const [pull, setPull] = useState<VerticalSlingPull>(EMPTY_PULL)
@@ -164,14 +172,15 @@ function VerticalSlingScene({
   }
 
   const reset = () => {
-    for (let index = 0; index < STARTER_STACK.length; index += 1) {
+    for (let index = 0; index < POG_COUNT; index += 1) {
       const body = pogBodies.current[index]
       if (!body) continue
       const offset = stackOffset(index)
+
       body.setTranslation(
         {
           x: offset.x,
-          y: 0.04 + index * STACK_SPACING,
+          y: STACK_BASE_Y + index * STACK_SPACING,
           z: offset.z,
         },
         true,
@@ -179,13 +188,14 @@ function VerticalSlingScene({
       body.setRotation({ x: 1, y: 0, z: 0, w: 0 }, true)
       body.setLinvel({ x: 0, y: 0, z: 0 }, true)
       body.setAngvel({ x: 0, y: 0, z: 0 }, true)
-      body.setLinearDamping(0.05)
-      body.setAngularDamping(0.08)
+      body.setLinearDamping(0.035)
+      body.setAngularDamping(0.045)
     }
 
     const body = slammerBody.current
     if (body) {
       body.setTranslation(ANCHOR, true)
+      body.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true)
       body.setLinvel({ x: 0, y: 0, z: 0 }, true)
       body.setAngvel({ x: 0, y: 0, z: 0 }, true)
     }
@@ -193,9 +203,7 @@ function VerticalSlingScene({
     dragOrigin.current = null
     releasedAt.current = null
     impactAt.current = null
-    impactPoint.current = null
-    impactNormal.current = null
-    peakContactForce.current = 0
+    activeLaunch.current = null
     stableFrames.current = 0
     setPull(EMPTY_PULL)
     setActive(new Set())
@@ -204,38 +212,40 @@ function VerticalSlingScene({
 
   const resolve = () => {
     const releaseTime = releasedAt.current
-    if (releaseTime === null) return
+    const launch = activeLaunch.current
+    if (releaseTime === null || !launch) return
 
     const flips = pogBodies.current.flatMap((body, index) =>
-      body && isFaceUpRotation(body.rotation(), FACE_UP_THRESHOLD)
+      body &&
+      isFaceUpRotation(body.rotation(), REAL_POG.faceUpThreshold)
         ? [STARTER_STACK[index]]
         : [],
     )
 
-    const now = performance.now()
+    const scatterRadiusCm = Math.max(
+      0,
+      ...pogBodies.current.map((body) => {
+        if (!body) return 0
+        const p = body.translation()
+        return Math.hypot(p.x, p.z)
+      }),
+    )
 
+    const now = performance.now()
     setActive(new Set(flips))
     setPhaseBoth('result')
 
-    const point = impactPoint.current
-    const normal = impactNormal.current
-    const normalTilt =
-      normal === null
-        ? null
-        : Math.acos(Math.min(1, Math.abs(normal.y))) * (180 / Math.PI)
-
     onResult({
       flips,
+      speedMps: launch.speedMps,
+      lateralFraction: launch.lateralFraction,
       releaseToImpactMs:
         impactAt.current === null ? null : impactAt.current - releaseTime,
       releaseToResolveMs: now - releaseTime,
-      contactEccentricity:
-        point === null ? null : Math.hypot(point.x, point.z) / POG_RADIUS,
-      contactNormalTiltDeg: normalTilt,
-      peakContactForce: peakContactForce.current,
+      scatterRadiusCm,
     })
 
-    window.setTimeout(reset, 320)
+    window.setTimeout(reset, 300)
   }
 
   useFrame(() => {
@@ -251,9 +261,9 @@ function VerticalSlingScene({
         },
         true,
       )
+      body.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true)
       body.setLinvel({ x: 0, y: 0, z: 0 }, true)
       body.setAngvel({ x: 0, y: 0, z: 0 }, true)
-      body.setRotation(verticalSlamOrientation(pull), true)
       return
     }
 
@@ -262,22 +272,22 @@ function VerticalSlingScene({
     const now = performance.now()
     const elapsed = now - releasedAt.current
 
-    if (impactAt.current !== null && now - impactAt.current > 380) {
+    if (impactAt.current !== null && now - impactAt.current > 500) {
       for (const pog of pogBodies.current) {
         if (!pog) continue
-        pog.setLinearDamping(0.52)
-        pog.setAngularDamping(0.72)
+        pog.setLinearDamping(0.45)
+        pog.setAngularDamping(0.6)
       }
     }
 
-    if (impactAt.current !== null && now - impactAt.current >= MIN_SETTLE_AFTER_IMPACT_MS) {
+    if (impactAt.current !== null && now - impactAt.current > 250) {
       const stable = pogBodies.current.every((pog) => {
         if (!pog) return true
-        return vecLength(pog.linvel()) < 0.45 && vecLength(pog.angvel()) < 1.2
+        return vecLength(pog.linvel()) < 8 && vecLength(pog.angvel()) < 2
       })
 
       stableFrames.current = stable ? stableFrames.current + 1 : 0
-      if (stableFrames.current >= 5) {
+      if (stableFrames.current >= 8) {
         resolve()
         return
       }
@@ -292,10 +302,13 @@ function VerticalSlingScene({
 
       const forward = camera.getWorldDirection(cameraForward.current)
       const horizontalLength = Math.hypot(forward.x, forward.z)
-
       const planeNormal =
         horizontalLength > 0.000001
-          ? { x: forward.x / horizontalLength, y: 0, z: forward.z / horizontalLength }
+          ? {
+              x: forward.x / horizontalLength,
+              y: 0,
+              z: forward.z / horizontalLength,
+            }
           : { x: 0, y: 0, z: -1 }
 
       const projected = projectClientPointToPlane(
@@ -316,24 +329,24 @@ function VerticalSlingScene({
         projected.x - origin.x,
         projected.y - origin.y,
         projected.z - origin.z,
+        PULL_CONFIG,
       )
 
       setPull(nextPull)
 
       if (!down && last) {
         dragOrigin.current = null
-
-        const impulse = verticalSlamImpulse(
-          nextPull,
-          family.physics.slamImpulse,
-        )
-
-        if (!impulse || !slammerBody.current) {
+        if (
+          nextPull.y < PULL_CONFIG.minVerticalPull ||
+          !slammerBody.current
+        ) {
           setPull(EMPTY_PULL)
           return
         }
 
+        const launch = launchFromRealScalePull(nextPull)
         const body = slammerBody.current
+
         body.setTranslation(
           {
             x: ANCHOR.x + nextPull.x,
@@ -342,25 +355,19 @@ function VerticalSlingScene({
           },
           true,
         )
-        body.setLinvel({ x: 0, y: 0, z: 0 }, true)
-        body.setRotation(verticalSlamOrientation(nextPull), true)
-        body.setAngvel({ x: 0, y: 0, z: 0 }, true)
+        body.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true)
+        body.setLinvel(launch.velocityCmPerSec, true)
+        body.setAngvel(
+          { x: 0, y: profile.spinRadPerSec, z: 0 },
+          true,
+        )
 
+        activeLaunch.current = launch
         releasedAt.current = performance.now()
         impactAt.current = null
         stableFrames.current = 0
         setActive(new Set())
         setPhaseBoth('flight')
-
-        body.applyImpulse(impulse, true)
-        body.setAngvel(
-          {
-            x: 0,
-            y: verticalSlamYawSpin(nextPull),
-            z: 0,
-          },
-          true,
-        )
       }
     },
     {
@@ -372,56 +379,74 @@ function VerticalSlingScene({
 
   return (
     <>
+      <CameraRig />
       <ambientLight intensity={1.15} />
-      <directionalLight position={[3, 7, 4]} intensity={3.5} castShadow />
+      <directionalLight position={[10, 26, 14]} intensity={3.5} castShadow />
 
       <RigidBody type="fixed" colliders={false}>
         <CuboidCollider
-          args={[3.75, 0.2, 3.75]}
-          position={[0, -0.22, 0]}
-          friction={TABLE_FRICTION}
+          args={[
+            REAL_WORLD.tableHalfSizeCm,
+            REAL_WORLD.tableHalfHeightCm,
+            REAL_WORLD.tableHalfSizeCm,
+          ]}
+          position={[0, -REAL_WORLD.tableHalfHeightCm, 0]}
+          friction={REAL_POG.tableFriction}
           frictionCombineRule={CoefficientCombineRule.Min}
+          restitution={REAL_POG.tableRestitution}
+          restitutionCombineRule={CoefficientCombineRule.Max}
         />
-        <mesh position={[0, -0.22, 0]} receiveShadow>
-          <boxGeometry args={[7.5, 0.4, 7.5]} />
+        <mesh position={[0, -REAL_WORLD.tableHalfHeightCm, 0]} receiveShadow>
+          <boxGeometry args={[30, 0.7, 30]} />
           <meshStandardMaterial color="#33291f" roughness={0.92} />
         </mesh>
       </RigidBody>
 
       {STARTER_STACK.map((id, index) => {
         const pog = pogById(id)
+        const offset = stackOffset(index)
+
         return (
           <RigidBody
             key={id}
+            name={'pog:' + id}
             ref={(body) => {
               pogBodies.current[index] = body
             }}
             colliders={false}
-            linearDamping={0.05}
-            angularDamping={0.08}
-            additionalSolverIterations={2}
+            linearDamping={0.035}
+            angularDamping={0.045}
+            additionalSolverIterations={3}
             position={[
-              stackOffset(index).x,
-              0.04 + index * STACK_SPACING,
-              stackOffset(index).z,
+              offset.x,
+              STACK_BASE_Y + index * STACK_SPACING,
+              offset.z,
             ]}
             rotation={[Math.PI, 0, index * 0.11]}
           >
             <RoundCylinderCollider
               args={[
-                POG_THICKNESS / 2 - POG_EDGE_RADIUS,
-                POG_RADIUS - POG_EDGE_RADIUS,
-                POG_EDGE_RADIUS,
+                REAL_POG.thicknessCm / 2 - REAL_POG.edgeRadiusCm,
+                REAL_POG.radiusCm - REAL_POG.edgeRadiusCm,
+                REAL_POG.edgeRadiusCm,
               ]}
-              mass={POG_MASS}
-              friction={CAP_FRICTION}
+              mass={REAL_POG.massKg}
+              friction={REAL_POG.capFriction}
               frictionCombineRule={CoefficientCombineRule.Min}
-              restitution={0.03}
-              restitutionCombineRule={CoefficientCombineRule.Min}
-              contactSkin={0.0015}
+              restitution={REAL_POG.capRestitution}
+              restitutionCombineRule={CoefficientCombineRule.Max}
+              contactSkin={0.003}
             />
+
             <mesh castShadow receiveShadow>
-              <cylinderGeometry args={[POG_RADIUS, POG_RADIUS, POG_THICKNESS, 40]} />
+              <cylinderGeometry
+                args={[
+                  REAL_POG.radiusCm,
+                  REAL_POG.radiusCm,
+                  REAL_POG.thicknessCm,
+                  48,
+                ]}
+              />
               <meshStandardMaterial
                 color={index % 2 ? '#d84738' : '#d6c894'}
                 roughness={0.7}
@@ -429,59 +454,53 @@ function VerticalSlingScene({
                 emissiveIntensity={active.has(id) ? 0.85 : 0}
               />
             </mesh>
-            <PogFace pog={pog} />
+
+            <PogFace
+              pog={pog}
+              radius={REAL_POG.radiusCm}
+              thickness={REAL_POG.thicknessCm}
+            />
           </RigidBody>
         )
       })}
 
       <RigidBody
+        name="slammer"
         ref={slammerBody}
         colliders={false}
         ccd
-        additionalSolverIterations={4}
-        linearDamping={0.04}
-        angularDamping={0.18}
+        softCcdPrediction={0.35}
+        additionalSolverIterations={6}
+        linearDamping={0.01}
+        angularDamping={0.04}
         position={[ANCHOR.x, ANCHOR.y, ANCHOR.z]}
-        onCollisionEnter={({ manifold, other }) => {
-          if (phaseRef.current !== 'flight' || impactAt.current !== null) return
+        onCollisionEnter={({ other }) => {
+          if (
+            phaseRef.current !== 'flight' ||
+            impactAt.current !== null
+          ) return
+
           const otherName = other.rigidBodyObject?.name ?? ''
           if (!otherName.startsWith('pog:')) return
-
           impactAt.current = performance.now()
-
-          if (manifold.numSolverContacts() > 0) {
-            const p = manifold.solverContactPoint(0)
-            impactPoint.current = { x: p.x, y: p.y, z: p.z }
-          }
-
-          const n = manifold.normal()
-          impactNormal.current = { x: n.x, y: n.y, z: n.z }
-        }}
-        onContactForce={(event) => {
-          if (phaseRef.current !== 'flight') return
-          const otherName = event.other.rigidBodyObject?.name ?? ''
-          if (!otherName.startsWith('pog:')) return
-          peakContactForce.current = Math.max(
-            peakContactForce.current,
-            event.totalForceMagnitude,
-          )
         }}
       >
         <CylinderCollider
-          args={[physicalSlammerThickness / 2, family.physics.radius]}
-          mass={family.physics.mass}
-          friction={SLAMMER_FRICTION}
+          args={[profile.thicknessCm / 2, profile.radiusCm]}
+          mass={profile.massKg}
+          friction={REAL_POG.slammerFriction}
           frictionCombineRule={CoefficientCombineRule.Max}
-          restitution={0.09}
+          restitution={REAL_POG.slammerRestitution}
           restitutionCombineRule={CoefficientCombineRule.Max}
         />
-        <group {...bind()} scale={phase === 'ready' ? 1.08 : 1}>
+
+        <group {...bind()} scale={phase === 'ready' ? 1.04 : 1}>
           <mesh castShadow>
             <cylinderGeometry
               args={[
-                family.physics.radius,
-                family.physics.radius,
-                physicalSlammerThickness,
+                profile.radiusCm,
+                profile.radiusCm,
+                profile.thicknessCm,
                 48,
               ]}
             />
@@ -496,29 +515,16 @@ function VerticalSlingScene({
         </group>
       </RigidBody>
 
-      {phase === 'ready' && pull.power > 0.03 && (
+      {phase === 'ready' && pull.power > 0.02 && (
         <>
-          <TrajectoryPreview
-            pull={pull}
-            familyMass={family.physics.mass}
-            baseImpulse={family.physics.slamImpulse}
-          />
-          <mesh position={[ANCHOR.x, 0.02, ANCHOR.z]} rotation={[-Math.PI / 2, 0, 0]}>
-            <ringGeometry args={[0.24, 0.3, 32]} />
-            <meshBasicMaterial color="#f3ff72" transparent opacity={0.5} />
-          </mesh>
+          <TrajectoryPreview pull={pull} familyId={slammer.familyId} />
 
           <mesh
-            position={[
-              ANCHOR.x + pull.x * 0.5,
-              ANCHOR.y + pull.y * 0.5,
-              ANCHOR.z + pull.z * 0.5,
-            ]}
+            position={[0, 0.02, 0]}
+            rotation={[-Math.PI / 2, 0, 0]}
           >
-            <sphereGeometry args={[0.055, 12, 12]} />
-            <meshBasicMaterial
-              color={pull.power > 0.82 ? '#ff765f' : '#f3ff72'}
-            />
+            <ringGeometry args={[0.38, 0.52, 32]} />
+            <meshBasicMaterial color="#f3ff72" transparent opacity={0.4} />
           </mesh>
         </>
       )}
@@ -527,31 +533,34 @@ function VerticalSlingScene({
 }
 
 export function VerticalSlingLab() {
-  const [last, setLast] = useState<{
-    flips: string[]
-    releaseToImpactMs: number | null
-    releaseToResolveMs: number
-    contactEccentricity: number | null
-    contactNormalTiltDeg: number | null
-    peakContactForce: number
-  } | null>(null)
+  const [last, setLast] = useState<Result | null>(null)
 
   return (
     <main className="slam-lab">
       <section className="slam-lab-sidebar">
-        <p className="eyebrow">EXPERIMENT / VERTICAL SLING</p>
-        <h1>Angry Birds, but down.</h1>
+        <p className="eyebrow">EXPERIMENT / REAL-SCALE VERTICAL SLING</p>
+        <h1>41 mm POG physics.</h1>
         <p className="lab-copy">
-          The slammer sits directly over the POG stack. Pull it upward to charge.
-          Release it and it becomes a normal dynamic rigid body flying downward
-          through the neutral point into the stack. Left/right pull only biases
-          the strike angle.
+          This scene now uses centimeter-scale POG dimensions, gram-scale cap
+          mass, real gravity, and the launch envelope selected by the headless
+          Rapier matrix. Pull upward to set speed; horizontal bias controls how
+          far off-center the slammer crosses the stack.
         </p>
 
         <section className="slam-metrics">
           <div>
             <span>LAST FLIPS</span>
             <strong>{last?.flips.length ?? '—'}</strong>
+          </div>
+          <div>
+            <span>SPEED</span>
+            <strong>{last ? last.speedMps.toFixed(2) + 'm/s' : '—'}</strong>
+          </div>
+          <div>
+            <span>LATERAL</span>
+            <strong>
+              {last ? Math.round(last.lateralFraction * 100) + '%' : '—'}
+            </strong>
           </div>
           <div>
             <span>TO IMPACT</span>
@@ -568,32 +577,17 @@ export function VerticalSlingLab() {
             </strong>
           </div>
           <div>
-            <span>CONTACT OFFSET</span>
+            <span>SCATTER</span>
             <strong>
-              {last?.contactEccentricity == null
-                ? '—'
-                : last.contactEccentricity.toFixed(2) + 'R'}
-            </strong>
-          </div>
-          <div>
-            <span>NORMAL TILT</span>
-            <strong>
-              {last?.contactNormalTiltDeg == null
-                ? '—'
-                : last.contactNormalTiltDeg.toFixed(1) + '°'}
-            </strong>
-          </div>
-          <div>
-            <span>PEAK FORCE</span>
-            <strong>
-              {last ? last.peakContactForce.toFixed(1) : '—'}
+              {last ? last.scatterRadiusCm.toFixed(1) + 'cm' : '—'}
             </strong>
           </div>
         </section>
 
         <p className="lab-copy">
-          This is real projectile physics after release — no rail, no kinematic snap,
-          and no horizontal tabletop fling.
+          The current target zone from the 16-seed validation is roughly
+          3.25–4.0 m/s with ~24–32% lateral impact: about 2–3 flips without
+          turning every slam into an eight-POG explosion.
         </p>
 
         <a className="binder-shortcut" href={appHref('/')}>
@@ -604,16 +598,24 @@ export function VerticalSlingLab() {
       <section className="lab-canvas">
         <Canvas
           shadows
-          camera={{ position: [0, 7.41, 8.19], fov: 34 }}
+          camera={{
+            position: [0, 26.4, 29.2],
+            fov: 34,
+            near: 0.1,
+            far: 120,
+          }}
           dpr={[1, 1.75]}
           style={{ touchAction: 'none' }}
         >
           <color attach="background" args={['#11100f']} />
-          <fog attach="fog" args={['#11100f', 9, 19]} />
+          <fog attach="fog" args={['#11100f', 36, 78]} />
+
           <Physics
-            gravity={[0, -9.81, 0]}
-            timeStep={1 / 120}
-            numSolverIterations={8}
+            gravity={[0, REAL_WORLD.gravityCmPerSec2, 0]}
+            lengthUnit={REAL_WORLD.unitsPerMeter}
+            timeStep={REAL_WORLD.timestep}
+            numSolverIterations={REAL_WORLD.solverIterations}
+            maxCcdSubsteps={REAL_WORLD.ccdSubsteps}
           >
             <VerticalSlingScene onResult={setLast} />
           </Physics>
