@@ -1,0 +1,25 @@
+name: POG Physics Report
+
+on:
+  push:
+    branches:
+      - tooling/physics-matrix-01
+    paths:
+      - "src/physics/**"
+      - "src/game/verticalSling.ts"
+      - ".github/workflows/physics-report.yml"
+  workflow_dispatch:
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - name: Run controlled headless physics report
+        env:
+          POG_PHYSICS_REPORT: "1"
+        run: npx vitest run src/physics/physicsMatrix.report.test.ts --reporter=verbose
