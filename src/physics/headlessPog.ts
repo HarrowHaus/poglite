@@ -305,15 +305,24 @@ export async function simulateVerticalShot(
     perCapPeak.reduce((sum, value) => sum + value, 0) /
     perCapPeak.length
 
+  // These refs are assigned from Rapier's synchronous contactPair callback.
+  // TypeScript cannot infer callback mutation across the simulation loop.
+  const capturedPoint = firstPoint as
+    | { x: number; y: number; z: number }
+    | null
+  const capturedNormal = firstNormal as
+    | { x: number; y: number; z: number }
+    | null
+
   const eccentricity =
-    firstPoint === null
+    capturedPoint === null
       ? null
-      : Math.hypot(firstPoint.x, firstPoint.z) / POG_RADIUS
+      : Math.hypot(capturedPoint.x, capturedPoint.z) / POG_RADIUS
 
   const normalTilt =
-    firstNormal === null
+    capturedNormal === null
       ? null
-      : Math.acos(Math.min(1, Math.abs(firstNormal.y))) *
+      : Math.acos(Math.min(1, Math.abs(capturedNormal.y))) *
         (180 / Math.PI)
 
   const result: HeadlessShotMetrics = {
