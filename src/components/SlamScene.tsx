@@ -1,4 +1,5 @@
-import { Canvas, type ThreeEvent, useFrame, useThree } from '@react-three/fiber'
+import { useDrag } from '@use-gesture/react'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Physics, RigidBody, type RapierRigidBody } from '@react-three/rapier'
 import {
   useEffect,
@@ -14,6 +15,11 @@ import {
   isFaceUpRotation,
   type SlamTuning,
 } from '../game/slamPhysics'
+import {
+  pullFromMovement,
+  slammerImpulse,
+  type PullVector,
+} from '../game/slamGesture'
 import { unlockFeedbackAudio } from '../presentation/audio'
 import { emitFeedback } from '../presentation/events'
 import { normalizeImpactForce } from '../presentation/feedbackMath'
@@ -31,6 +37,12 @@ interface SlamSceneProps {
 const POG_RADIUS = 0.58
 const POG_THICKNESS = 0.07
 
+// Camera is deliberately 30% farther from the table than the initial physics demo.
+const CAMERA_Y = 7.41
+const CAMERA_Z = 8.19
+const SLAMMER_ANCHOR = { x: 0, y: 1.35, z: 1.8 }
+const EMPTY_PULL: PullVector = { x: 0, z: 0, power: 0 }
+
 function CameraFeedback({ impact }: { impact: MutableRefObject<number> }) {
   const { camera } = useThree()
 
@@ -40,9 +52,9 @@ function CameraFeedback({ impact }: { impact: MutableRefObject<number> }) {
     const t = clock.elapsedTime
 
     camera.position.set(
-      Math.sin(t * 103) * kick * 0.055,
-      5.7 + Math.cos(t * 89) * kick * 0.035,
-      6.3 + kick * 0.12,
+      Math.sin(t * 103) * kick * 0.065,
+      CAMERA_Y + Math.cos(t * 89) * kick * 0.045,
+      CAMERA_Z + kick * 0.16,
     )
     camera.lookAt(0, 0.12, 0)
   })
@@ -146,6 +158,40 @@ function PogStack({
   )
 }
 
+function PullTether({ pull }: { pull: PullVector }) {
+  const length = Math.hypot(pull.x, pull.z)
+  if (length <= 0.02) return null
+
+  const midpointX = SLAMMER_ANCHOR.x + pull.x / 2
+  const midpointZ = SLAMMER_ANCHOR.z + pull.z / 2
+  const angle = Math.atan2(pull.x, pull.z)
+
+  return (
+    <>
+      <mesh
+        position={[midpointX, SLAMMER_ANCHOR.y, midpointZ]}
+        rotation={[0, angle, 0]}
+      >
+        <boxGeometry args={[0.045, 0.045, length]} />
+        <meshBasicMaterial
+          color={pull.power > 0.82 ? '#ff765f' : '#f3ff72'}
+          transparent
+          opacity={0.78}
+          toneMapped={false}
+        />
+      </mesh>
+
+      <mesh
+        position={[SLAMMER_ANCHOR.x, 0.018, SLAMMER_ANCHOR.z]}
+        rotation={[-Math.PI / 2, 0, 0]}
+      >
+        <ringGeometry args={[0.22, 0.28, 32]} />
+        <meshBasicMaterial color="#f3ff72" transparent opacity={0.45} />
+      </mesh>
+    </>
+  )
+}
+
 function Playfield({
   pogIds,
   slammer,
@@ -162,11 +208,12 @@ function Playfield({
   const pogBodies = useRef<Array<RapierRigidBody | null>>([])
   const cameraImpact = useRef(0)
   const impactSent = useRef(false)
-  const [aim, setAim] = useState({ x: 0.24, z: 0.12 })
+  const [pull, setPull] = useState<PullVector>(EMPTY_PULL)
   const [phase, setPhase] = useState<'ready' | 'slamming' | 'resolving'>('ready')
   const [activeIds, setActiveIds] = useState<Set<string>>(new Set())
   const settleTimer = useRef<number | undefined>(undefined)
   const resetTimer = useRef<number | undefined>(undefined)
+  const { size, viewport } = useThree()
 
   const restPositions = useMemo(() => {
     const spacing = POG_THICKNESS + tuning.stackGap
@@ -183,7 +230,15 @@ function Playfield({
 
   useFrame(() => {
     if (phase !== 'ready' || !slammerBody.current) return
-    slammerBody.current.setTranslation({ x: aim.x, y: 2.25, z: aim.z }, true)
+
+    slammerBody.current.setTranslation(
+      {
+        x: SLAMMER_ANCHOR.x + pull.x,
+        y: SLAMMER_ANCHOR.y,
+        z: SLAMMER_ANCHOR.z + pull.z,
+      },
+      true,
+    )
     slammerBody.current.setLinvel({ x: 0, y: 0, z: 0 }, true)
     slammerBody.current.setAngvel({ x: 0, y: 0, z: 0 }, true)
   })
@@ -197,31 +252,19 @@ function Playfield({
       body.setAngvel({ x: 0, y: 0, z: 0 }, true)
     })
 
+    if (slammerBody.current) {
+      slammerBody.current.setTranslation(SLAMMER_ANCHOR, true)
+      slammerBody.current.setLinvel({ x: 0, y: 0, z: 0 }, true)
+      slammerBody.current.setAngvel({ x: 0, y: 0, z: 0 }, true)
+    }
+
+    setPull(EMPTY_PULL)
     setActiveIds(new Set())
     impactSent.current = false
     setPhase('ready')
   }
 
-  const slam = () => {
-    if (disabled || phase !== 'ready' || !slammerBody.current) return
-
-    unlockFeedbackAudio()
-    emitFeedback({ type: 'slam:start' })
-    impactSent.current = false
-    setActiveIds(new Set())
-    setPhase('slamming')
-
-    slammerBody.current.setLinvel({ x: 0, y: 0, z: 0 }, true)
-    slammerBody.current.applyImpulse(
-      {
-        x: 0,
-        y: -family.physics.slamImpulse * tuning.impulseMultiplier,
-        z: 0,
-      },
-      true,
-    )
-    slammerBody.current.applyTorqueImpulse({ x: 0.08, y: 0.15, z: -0.06 }, true)
-
+  const resolveAfterSlam = () => {
     settleTimer.current = window.setTimeout(() => {
       setPhase('resolving')
       const flipped = pogBodies.current.flatMap((body, index) =>
@@ -237,13 +280,63 @@ function Playfield({
     }, tuning.settleMs)
   }
 
-  const aimFromPointer = (event: ThreeEvent<PointerEvent>) => {
-    if (disabled || phase !== 'ready') return
-    setAim({
-      x: Math.max(-1.15, Math.min(1.15, event.point.x)),
-      z: Math.max(-1.15, Math.min(1.15, event.point.z)),
-    })
+  const launch = (releasePull: PullVector) => {
+    if (disabled || phase !== 'ready' || !slammerBody.current) return
+
+    const impulse = slammerImpulse(
+      releasePull,
+      family.physics.slamImpulse * tuning.impulseMultiplier,
+    )
+    if (!impulse) {
+      setPull(EMPTY_PULL)
+      return
+    }
+
+    unlockFeedbackAudio()
+    emitFeedback({ type: 'slam:start' })
+    impactSent.current = false
+    setActiveIds(new Set())
+    setPhase('slamming')
+
+    slammerBody.current.setLinvel({ x: 0, y: 0, z: 0 }, true)
+    slammerBody.current.setAngvel({ x: 0, y: 0, z: 0 }, true)
+    slammerBody.current.applyImpulse(impulse, true)
+    slammerBody.current.applyTorqueImpulse(
+      {
+        x: releasePull.z * 0.45,
+        y: 0.35 + releasePull.power * 0.75,
+        z: -releasePull.x * 0.45,
+      },
+      true,
+    )
+
+    resolveAfterSlam()
   }
+
+  const bind = useDrag(
+    ({ down, last, movement: [movementX, movementY], first }) => {
+      if (disabled || phase !== 'ready') return
+
+      if (first) unlockFeedbackAudio()
+
+      const nextPull = pullFromMovement(
+        movementX,
+        movementY,
+        viewport.width / size.width,
+        viewport.height / size.height,
+      )
+
+      setPull(nextPull)
+
+      if (!down && last) launch(nextPull)
+    },
+    {
+      enabled: !disabled && phase === 'ready',
+      filterTaps: true,
+      threshold: 3,
+      pointer: { capture: true },
+    },
+  )
 
   return (
     <>
@@ -254,6 +347,7 @@ function Playfield({
 
       <Table />
       <PogStack ids={pogIds} bodies={pogBodies} tuning={tuning} activeIds={activeIds} />
+      {phase === 'ready' && <PullTether pull={pull} />}
 
       <RigidBody
         name="slammer"
@@ -264,7 +358,7 @@ function Playfield({
         restitution={tuning.slammerRestitution}
         linearDamping={0.22}
         angularDamping={0.18}
-        position={[aim.x, 2.25, aim.z]}
+        position={[SLAMMER_ANCHOR.x, SLAMMER_ANCHOR.y, SLAMMER_ANCHOR.z]}
         onContactForce={(event) => {
           if (phase !== 'slamming' || impactSent.current) return
           const otherName = event.other.rigidBodyObject?.name ?? ''
@@ -278,52 +372,42 @@ function Playfield({
           emitFeedback({ type: 'slam:impact', strength })
         }}
       >
-        <mesh castShadow>
-          <cylinderGeometry
-            args={[family.physics.radius, family.physics.radius, family.physics.thickness, 48]}
-          />
-          <meshStandardMaterial
-            color="#aeb7bd"
-            metalness={0.9}
-            roughness={0.2}
-          />
-        </mesh>
-        <mesh position={[0, family.physics.thickness / 2 + 0.004, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[family.physics.radius * 0.45, family.physics.radius * 0.78, 48]} />
-          <meshStandardMaterial color="#20252a" metalness={0.82} roughness={0.3} />
-        </mesh>
+        <group {...bind()} scale={phase === 'ready' ? 1.05 : 1}>
+          <mesh castShadow>
+            <cylinderGeometry
+              args={[family.physics.radius, family.physics.radius, family.physics.thickness, 48]}
+            />
+            <meshStandardMaterial
+              color="#aeb7bd"
+              metalness={0.9}
+              roughness={0.2}
+              emissive={pull.power > 0.8 ? '#3d180f' : '#000000'}
+              emissiveIntensity={pull.power > 0.8 ? 0.7 : 0}
+            />
+          </mesh>
+          <mesh
+            position={[0, family.physics.thickness / 2 + 0.004, 0]}
+            rotation={[-Math.PI / 2, 0, 0]}
+          >
+            <ringGeometry args={[family.physics.radius * 0.45, family.physics.radius * 0.78, 48]} />
+            <meshStandardMaterial color="#20252a" metalness={0.82} roughness={0.3} />
+          </mesh>
+        </group>
       </RigidBody>
-
-      <mesh
-        position={[0, 0.015, 0]}
-        rotation={[-Math.PI / 2, 0, 0]}
-        onPointerMove={aimFromPointer}
-        onPointerDown={(event) => {
-          aimFromPointer(event)
-          slam()
-        }}
-      >
-        <planeGeometry args={[7, 7]} />
-        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
-      </mesh>
-
-      <mesh position={[aim.x, 0.018, aim.z]} rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[0.23, 0.29, 32]} />
-        <meshBasicMaterial
-          color={!disabled && phase === 'ready' ? '#f3ff72' : '#777'}
-          transparent
-          opacity={phase === 'ready' ? 0.85 : 0.15}
-        />
-      </mesh>
     </>
   )
 }
 
 export function SlamScene({ debugPhysics = false, ...props }: SlamSceneProps) {
   return (
-    <Canvas shadows camera={{ position: [0, 5.7, 6.3], fov: 34 }} dpr={[1, 1.75]}>
+    <Canvas
+      shadows
+      camera={{ position: [0, CAMERA_Y, CAMERA_Z], fov: 34 }}
+      dpr={[1, 1.75]}
+      style={{ touchAction: 'none' }}
+    >
       <color attach="background" args={['#11100f']} />
-      <fog attach="fog" args={['#11100f', 7, 14]} />
+      <fog attach="fog" args={['#11100f', 9, 19]} />
       <Physics debug={debugPhysics} gravity={[0, -9.81, 0]} timeStep={1 / 60}>
         <Playfield {...props} />
       </Physics>
