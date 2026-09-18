@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
+import { PackReveal } from './PackReveal'
 import { RewardTray } from './RewardTray'
 import { SlamScene } from './SlamScene'
-import { ENEMIES, STARTER_STACK, pogById } from '../game/content'
+import { ENEMIES, POGS, STARTER_STACK, pogById } from '../game/content'
+import { useCollectionStore } from '../game/collectionStore'
 import { isFinalEncounter } from '../game/run'
 import { useGameStore } from '../game/store'
 import { emitFeedback, onFeedback } from '../presentation/events'
+import type { PackResult } from '../game/types'
 
 function Meter({ value, max }: { value: number; max: number }) {
   const pct = Math.max(0, Math.min(100, (value / max) * 100))
@@ -17,23 +20,31 @@ function Meter({ value, max }: { value: number; max: number }) {
 
 export function GameShell() {
   const {
+    runSeed,
     battle,
     encounterIndex,
     phase,
     rewards,
     slammer,
     lastResolution,
+    completionPackClaimed,
     resolve,
     openReward,
     chooseReward,
+    claimCompletionPack,
     restartRun,
   } = useGameStore()
+
+  const entries = useCollectionStore((state) => state.entries)
+  const openPack = useCollectionStore((state) => state.openPack)
+  const ownedCount = POGS.filter((pog) => (entries[pog.id]?.copies ?? 0) > 0).length
 
   const enemy = ENEMIES[encounterIndex]
   const [impact, setImpact] = useState({ id: 0, strength: 0 })
   const [enemyHit, setEnemyHit] = useState({ id: 0, amount: 0 })
   const [playerHit, setPlayerHit] = useState({ id: 0, amount: 0 })
   const [showActivations, setShowActivations] = useState(false)
+  const [completionPack, setCompletionPack] = useState<PackResult | null>(null)
 
   const activatedPogs = useMemo(
     () => lastResolution?.flippedPogIds.map(pogById) ?? [],
@@ -92,10 +103,17 @@ export function GameShell() {
     chooseReward(instanceId)
   }
 
+  const handleCompletionPack = () => {
+    if (!claimCompletionPack()) return
+    const pack = openPack(runSeed + ':completion')
+    setCompletionPack(pack)
+  }
+
   const handleRestart = () => {
     setShowActivations(false)
     setEnemyHit({ id: 0, amount: 0 })
     setPlayerHit({ id: 0, amount: 0 })
+    setCompletionPack(null)
     restartRun()
   }
 
@@ -113,10 +131,17 @@ export function GameShell() {
           <Meter value={battle.enemyHp} max={battle.enemyMaxHp} />
           <p className="hud-number">{battle.enemyHp} / {battle.enemyMaxHp} HP</p>
         </div>
-        <div className="intent">
-          <span>{battle.won ? 'DOWN' : 'NEXT'}</span>
-          <strong>{battle.won ? '—' : enemy.attack}</strong>
-          <small>{battle.won ? 'CLEARED' : 'DAMAGE'}</small>
+
+        <div className="combat-hud-actions">
+          <a className="binder-shortcut" href="/binder">
+            BINDER
+            <strong>{ownedCount}/{POGS.length}</strong>
+          </a>
+          <div className="intent">
+            <span>{battle.won ? 'DOWN' : 'NEXT'}</span>
+            <strong>{battle.won ? '—' : enemy.attack}</strong>
+            <small>{battle.won ? 'CLEARED' : 'DAMAGE'}</small>
+          </div>
         </div>
       </header>
 
@@ -173,25 +198,49 @@ export function GameShell() {
           <RewardTray rewards={rewards} onChoose={handleChooseReward} />
         )}
 
-        {phase === 'complete' && (
+        {phase === 'complete' && !completionPack && (
           <div className="run-complete-overlay">
             <p className="eyebrow">RUN COMPLETE</p>
             <h2>Five fights. Still standing.</h2>
-            <p>The run cadence works without adding a map or another control scheme.</p>
-            <button onClick={handleRestart}>RUN IT AGAIN</button>
+            {!completionPackClaimed ? (
+              <>
+                <p>Your permanent reward is waiting.</p>
+                <button onClick={handleCompletionPack}>OPEN 5-POG PACK</button>
+              </>
+            ) : (
+              <>
+                <p>The completion pack is already in your binder.</p>
+                <div className="run-complete-actions">
+                  <a href="/binder">VIEW BINDER</a>
+                  <button onClick={handleRestart}>RUN IT AGAIN</button>
+                </div>
+              </>
+            )}
           </div>
         )}
 
+        {completionPack && (
+          <PackReveal
+            pack={completionPack}
+            onDone={() => {
+              setCompletionPack(null)
+              window.location.href = '/binder'
+            }}
+          />
+        )}
+
         <div className="slam-instruction">
-          {phase === 'reward'
-            ? 'CHOOSE ONE'
-            : phase === 'complete'
-              ? 'RUN COMPLETE'
-              : battle.won
-                ? finalEncounter ? 'FINAL ENCOUNTER CLEARED' : 'REWARD READY'
-                : battle.lost
-                  ? 'RUN ENDED'
-                  : 'MOVE TO AIM · TAP TABLE TO SLAM'}
+          {completionPack
+            ? 'PACK REVEAL'
+            : phase === 'reward'
+              ? 'CHOOSE ONE'
+              : phase === 'complete'
+                ? 'RUN COMPLETE'
+                : battle.won
+                  ? finalEncounter ? 'FINAL ENCOUNTER CLEARED' : 'REWARD READY'
+                  : battle.lost
+                    ? 'RUN ENDED'
+                    : 'MOVE TO AIM · TAP TABLE TO SLAM'}
         </div>
       </section>
 
