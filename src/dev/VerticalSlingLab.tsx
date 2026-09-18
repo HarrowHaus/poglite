@@ -1,13 +1,14 @@
 import { useDrag } from '@use-gesture/react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import {
+  CoefficientCombineRule,
   CuboidCollider,
   Physics,
   RoundCylinderCollider,
   RigidBody,
   type RapierRigidBody,
 } from '@react-three/rapier'
-import { Vector3 } from 'three'
+import { Quaternion, Vector3 } from 'three'
 import { useMemo, useRef, useState } from 'react'
 import { PogFace } from '../components/PogFace'
 import { STARTER_STACK, pogById, slammerFamilyById } from '../game/content'
@@ -28,9 +29,11 @@ const POG_THICKNESS = 0.045
 const POG_EDGE_RADIUS = 0.006
 const POG_MASS = 0.08
 const STACK_SPACING = 0.046
-const CAP_FRICTION = 0.42
-const TABLE_FRICTION = 0.44
-const SLAMMER_FRICTION = 0.36
+const CAP_FRICTION = 0.18
+const TABLE_FRICTION = 0.30
+const SLAMMER_FRICTION = 0.95
+const BASE_TILT_RADIANS = 0.13
+const EXTRA_TILT_RADIANS = 0.16
 const FACE_UP_THRESHOLD = 0.72
 
 const ANCHOR = { x: 0, y: 1.35, z: 0 }
@@ -49,6 +52,19 @@ function stackOffset(index: number) {
 
 function vecLength(v: { x: number; y: number; z: number }) {
   return Math.hypot(v.x, v.y, v.z)
+}
+
+function slammerTiltQuaternion(pull: VerticalSlingPull) {
+  const lateral = Math.hypot(pull.x, pull.z)
+  const lateralShare =
+    pull.y > 0.0001 ? Math.min(1, lateral / (pull.y * 0.48)) : 0
+
+  const dirX = lateral > 0.0001 ? pull.x / lateral : 0
+  const dirZ = lateral > 0.0001 ? pull.z / lateral : 1
+  const axis = new Vector3(dirZ, 0, -dirX).normalize()
+  const angle = BASE_TILT_RADIANS + EXTRA_TILT_RADIANS * lateralShare
+
+  return new Quaternion().setFromAxisAngle(axis, angle)
 }
 
 function TrajectoryPreview({
@@ -126,6 +142,9 @@ function VerticalSlingScene({
     flips: string[]
     releaseToImpactMs: number | null
     releaseToResolveMs: number
+    contactEccentricity: number | null
+    contactNormalTiltDeg: number | null
+    peakContactForce: number
   }) => void
 }) {
   const { camera, gl } = useThree()
@@ -140,6 +159,9 @@ function VerticalSlingScene({
   const releasedAt = useRef<number | null>(null)
   const impactAt = useRef<number | null>(null)
   const stableFrames = useRef(0)
+  const impactPoint = useRef<{ x: number; y: number; z: number } | null>(null)
+  const impactNormal = useRef<{ x: number; y: number; z: number } | null>(null)
+  const peakContactForce = useRef(0)
 
   const [phase, setPhase] = useState<'ready' | 'flight' | 'result'>('ready')
   const [pull, setPull] = useState<VerticalSlingPull>(EMPTY_PULL)
@@ -180,6 +202,9 @@ function VerticalSlingScene({
     dragOrigin.current = null
     releasedAt.current = null
     impactAt.current = null
+    impactPoint.current = null
+    impactNormal.current = null
+    peakContactForce.current = 0
     stableFrames.current = 0
     setPull(EMPTY_PULL)
     setActive(new Set())
@@ -201,11 +226,22 @@ function VerticalSlingScene({
     setActive(new Set(flips))
     setPhaseBoth('result')
 
+    const point = impactPoint.current
+    const normal = impactNormal.current
+    const normalTilt =
+      normal === null
+        ? null
+        : Math.acos(Math.min(1, Math.abs(normal.y))) * (180 / Math.PI)
+
     onResult({
       flips,
       releaseToImpactMs:
         impactAt.current === null ? null : impactAt.current - releaseTime,
       releaseToResolveMs: now - releaseTime,
+      contactEccentricity:
+        point === null ? null : Math.hypot(point.x, point.z) / POG_RADIUS,
+      contactNormalTiltDeg: normalTilt,
+      peakContactForce: peakContactForce.current,
     })
 
     window.setTimeout(reset, 320)
@@ -226,6 +262,7 @@ function VerticalSlingScene({
       )
       body.setLinvel({ x: 0, y: 0, z: 0 }, true)
       body.setAngvel({ x: 0, y: 0, z: 0 }, true)
+      body.setRotation(slammerTiltQuaternion(pull), true)
       return
     }
 
@@ -315,6 +352,7 @@ function VerticalSlingScene({
           true,
         )
         body.setLinvel({ x: 0, y: 0, z: 0 }, true)
+        body.setRotation(slammerTiltQuaternion(nextPull), true)
         body.setAngvel({ x: 0, y: 0, z: 0 }, true)
 
         releasedAt.current = performance.now()
@@ -328,7 +366,7 @@ function VerticalSlingScene({
         body.setAngvel(
           {
             x: 0,
-            y: spinDirection * (3.2 + nextPull.power * 5.8),
+            y: spinDirection * (4.2 + nextPull.power * 7.2),
             z: 0,
           },
           true,
@@ -352,6 +390,7 @@ function VerticalSlingScene({
           args={[3.75, 0.2, 3.75]}
           position={[0, -0.22, 0]}
           friction={TABLE_FRICTION}
+          frictionCombineRule={CoefficientCombineRule.Min}
         />
         <mesh position={[0, -0.22, 0]} receiveShadow>
           <boxGeometry args={[7.5, 0.4, 7.5]} />
@@ -386,7 +425,10 @@ function VerticalSlingScene({
               ]}
               mass={POG_MASS}
               friction={CAP_FRICTION}
-              restitution={0.04}
+              frictionCombineRule={CoefficientCombineRule.Min}
+              restitution={0.03}
+              restitutionCombineRule={CoefficientCombineRule.Min}
+              contactSkin={0.0015}
             />
             <mesh castShadow receiveShadow>
               <cylinderGeometry args={[POG_RADIUS, POG_RADIUS, POG_THICKNESS, 40]} />
@@ -407,15 +449,32 @@ function VerticalSlingScene({
         colliders={false}
         ccd
         additionalSolverIterations={4}
-        enabledRotations={[false, true, false]}
         linearDamping={0.04}
-        angularDamping={0.05}
+        angularDamping={0.18}
         position={[ANCHOR.x, ANCHOR.y, ANCHOR.z]}
-        onContactForce={(event) => {
+        onCollisionEnter={({ manifold, other }) => {
           if (phaseRef.current !== 'flight' || impactAt.current !== null) return
+          const otherName = other.rigidBodyObject?.name ?? ''
+          if (!otherName.startsWith('pog:')) return
+
+          impactAt.current = performance.now()
+
+          if (manifold.numSolverContacts() > 0) {
+            const p = manifold.solverContactPoint(0)
+            impactPoint.current = { x: p.x, y: p.y, z: p.z }
+          }
+
+          const n = manifold.normal()
+          impactNormal.current = { x: n.x, y: n.y, z: n.z }
+        }}
+        onContactForce={(event) => {
+          if (phaseRef.current !== 'flight') return
           const otherName = event.other.rigidBodyObject?.name ?? ''
           if (!otherName.startsWith('pog:')) return
-          impactAt.current = performance.now()
+          peakContactForce.current = Math.max(
+            peakContactForce.current,
+            event.totalForceMagnitude,
+          )
         }}
       >
         <RoundCylinderCollider
@@ -426,7 +485,9 @@ function VerticalSlingScene({
           ]}
           mass={family.physics.mass}
           friction={SLAMMER_FRICTION}
-          restitution={0.05}
+          frictionCombineRule={CoefficientCombineRule.Max}
+          restitution={0.09}
+          restitutionCombineRule={CoefficientCombineRule.Max}
         />
         <group {...bind()} scale={phase === 'ready' ? 1.08 : 1}>
           <mesh castShadow>
@@ -484,6 +545,9 @@ export function VerticalSlingLab() {
     flips: string[]
     releaseToImpactMs: number | null
     releaseToResolveMs: number
+    contactEccentricity: number | null
+    contactNormalTiltDeg: number | null
+    peakContactForce: number
   } | null>(null)
 
   return (
@@ -515,6 +579,28 @@ export function VerticalSlingLab() {
             <span>TO RESULT</span>
             <strong>
               {last ? Math.round(last.releaseToResolveMs) + 'ms' : '—'}
+            </strong>
+          </div>
+          <div>
+            <span>CONTACT OFFSET</span>
+            <strong>
+              {last?.contactEccentricity == null
+                ? '—'
+                : last.contactEccentricity.toFixed(2) + 'R'}
+            </strong>
+          </div>
+          <div>
+            <span>NORMAL TILT</span>
+            <strong>
+              {last?.contactNormalTiltDeg == null
+                ? '—'
+                : last.contactNormalTiltDeg.toFixed(1) + '°'}
+            </strong>
+          </div>
+          <div>
+            <span>PEAK FORCE</span>
+            <strong>
+              {last ? last.peakContactForce.toFixed(1) : '—'}
             </strong>
           </div>
         </section>
