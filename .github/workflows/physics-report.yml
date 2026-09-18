@@ -25,3 +25,4 @@ jobs:
         run: |
           npx vitest run src/physics/physicsMatrix.report.test.ts --reporter=verbose
           npx vitest run src/physics/physicsSearch.report.test.ts --reporter=verbose
+          npx vitest run src/physics/realScalePog.report.test.ts --reporter=verbose
