@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { ACTIVE_STACK_SIZE } from '../game/collection'
+import { appHref } from '../navigation'
 import { useCollectionStore } from '../game/collectionStore'
 import { POGS } from '../game/content'
 import { PogMedallion } from './PogMedallion'
@@ -42,7 +43,7 @@ export function StackBuilder() {
             Pick exactly {ACTIVE_STACK_SIZE} different POGs you own. Nothing else changes.
           </p>
         </div>
-        <a href="/">BACK TO TABLE</a>
+        <a href={appHref('/')}>BACK TO TABLE</a>
       </header>
 
       <section className="active-stack-tray">
