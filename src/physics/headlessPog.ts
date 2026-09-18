@@ -41,6 +41,8 @@ export interface HeadlessShotInput {
   capRestitution?: number
   tableRestitution?: number
   slammerRestitution?: number
+  capMass?: number
+  impulseScale?: number
 }
 
 export interface HeadlessShotMetrics {
@@ -95,6 +97,8 @@ export async function simulateVerticalShot(
   const capRestitution = input.capRestitution ?? 0.03
   const tableRestitution = input.tableRestitution ?? 0
   const slammerRestitution = input.slammerRestitution ?? 0.09
+  const capMass = input.capMass ?? POG_MASS
+  const impulseScale = input.impulseScale ?? 1
 
   const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 })
   world.timestep = TIMESTEP
@@ -132,7 +136,7 @@ export async function simulateVerticalShot(
       POG_RADIUS - POG_EDGE_RADIUS,
       POG_EDGE_RADIUS,
     )
-      .setMass(POG_MASS)
+      .setMass(capMass)
       .setFriction(CAP_FRICTION)
       .setFrictionCombineRule(RAPIER.CoefficientCombineRule.Min)
       .setRestitution(capRestitution)
@@ -150,7 +154,10 @@ export async function simulateVerticalShot(
     0,
   )
 
-  const impulse = verticalSlamImpulse(pull, family.physics.slamImpulse)
+  const impulse = verticalSlamImpulse(
+    pull,
+    family.physics.slamImpulse * impulseScale,
+  )
   if (!impulse) {
     world.free()
     return {
