@@ -21,7 +21,8 @@
     "zustand": "^5.0.0",
     "@use-gesture/react": "^10.3.1",
     "pure-rand": "^8.4.2",
-    "leva": "^0.10.1"
+    "leva": "^0.10.1",
+    "@dimforge/rapier3d-compat": "0.19.2"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",
@@ -33,7 +34,6 @@
     "vitest": "^3.0.0",
     "fast-check": "^4.10.1",
     "@playwright/test": "^1.63.0",
-    "@dimforge/rapier3d-compat": "0.19.2",
     "@types/node": "^24.0.0"
   }
 }
