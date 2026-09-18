@@ -3,6 +3,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import {
   CoefficientCombineRule,
   CuboidCollider,
+  CylinderCollider,
   Physics,
   RoundCylinderCollider,
   RigidBody,
@@ -150,6 +151,7 @@ function VerticalSlingScene({
   const { camera, gl } = useThree()
   const slammer = useMemo(() => rollSlammer('vertical-sling-lab', 4), [])
   const family = slammerFamilyById(slammer.familyId)
+  const physicalSlammerThickness = family.physics.thickness * 1.55
 
   const slammerBody = useRef<RapierRigidBody>(null)
   const pogBodies = useRef<Array<RapierRigidBody | null>>([])
@@ -477,12 +479,8 @@ function VerticalSlingScene({
           )
         }}
       >
-        <RoundCylinderCollider
-          args={[
-            Math.max(0.01, family.physics.thickness / 2 - 0.012),
-            Math.max(0.1, family.physics.radius - 0.012),
-            0.012,
-          ]}
+        <CylinderCollider
+          args={[physicalSlammerThickness / 2, family.physics.radius]}
           mass={family.physics.mass}
           friction={SLAMMER_FRICTION}
           frictionCombineRule={CoefficientCombineRule.Max}
@@ -495,7 +493,7 @@ function VerticalSlingScene({
               args={[
                 family.physics.radius,
                 family.physics.radius,
-                family.physics.thickness,
+                physicalSlammerThickness,
                 48,
               ]}
             />
