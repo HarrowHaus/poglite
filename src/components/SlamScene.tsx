@@ -1,7 +1,6 @@
 import { useDrag } from '@use-gesture/react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Physics, RigidBody, type RapierRigidBody } from '@react-three/rapier'
-import { Vector3 } from 'three'
 import {
   useEffect,
   useMemo,
@@ -17,13 +16,13 @@ import {
   type SlamTuning,
 } from '../game/slamPhysics'
 import {
-  pullFromScreenMovement,
-  screenPlaneBasisFromCameraForward,
+  pullFromWorldDelta,
   slammerImpulse,
   type PullVector,
 } from '../game/slamGesture'
 import type { SlamTelemetrySample } from '../game/slamTelemetry'
 import { unlockFeedbackAudio } from '../presentation/audio'
+import { projectClientPointToHorizontalPlane } from '../presentation/pointerProjection'
 import { emitFeedback } from '../presentation/events'
 import { normalizeImpactForce } from '../presentation/feedbackMath'
 import type { GeneratedSlammer } from '../game/types'
@@ -231,15 +230,15 @@ function Playfield({
   const slammerBody = useRef<RapierRigidBody>(null)
   const pogBodies = useRef<Array<RapierRigidBody | null>>([])
   const cameraImpact = useRef(0)
-  const cameraForward = useRef(new Vector3())
   const impactSent = useRef(false)
   const activeShot = useRef<ActiveShot | null>(null)
+  const dragOriginWorld = useRef<{ x: number; z: number } | null>(null)
   const [pull, setPull] = useState<PullVector>(EMPTY_PULL)
   const [phase, setPhase] = useState<'ready' | 'slamming' | 'resolving'>('ready')
   const [activeIds, setActiveIds] = useState<Set<string>>(new Set())
   const settleTimer = useRef<number | undefined>(undefined)
   const resetTimer = useRef<number | undefined>(undefined)
-  const { size, viewport, camera } = useThree()
+  const { camera, gl } = useThree()
 
   const slammerAnchor = useMemo<Anchor>(
     () => ({
@@ -294,6 +293,7 @@ function Playfield({
     }
 
     activeShot.current = null
+    dragOriginWorld.current = null
     setPull(EMPTY_PULL)
     setActiveIds(new Set())
     impactSent.current = false
@@ -376,25 +376,45 @@ function Playfield({
   }
 
   const bind = useDrag(
-    ({ down, last, movement: [movementX, movementY], first }) => {
+    ({ down, last, xy: [clientX, clientY], first }) => {
       if (disabled || phase !== 'ready') return
 
-      if (first) unlockFeedbackAudio()
+      const projected = projectClientPointToHorizontalPlane(
+        camera,
+        clientX,
+        clientY,
+        gl.domElement.getBoundingClientRect(),
+        slammerAnchor.y,
+      )
 
-      const forward = camera.getWorldDirection(cameraForward.current)
-      const basis = screenPlaneBasisFromCameraForward(forward.x, forward.z)
-      const nextPull = pullFromScreenMovement(
-        movementX,
-        movementY,
-        viewport.width / size.width,
-        viewport.height / size.height,
-        basis,
+      if (first) {
+        unlockFeedbackAudio()
+        dragOriginWorld.current = projected
+          ? { x: projected.x, z: projected.z }
+          : null
+      }
+
+      const origin = dragOriginWorld.current
+      if (!projected || !origin) {
+        if (!down && last) {
+          dragOriginWorld.current = null
+          setPull(EMPTY_PULL)
+        }
+        return
+      }
+
+      const nextPull = pullFromWorldDelta(
+        projected.x - origin.x,
+        projected.z - origin.z,
         tuning.maxPullWorld,
       )
 
       setPull(nextPull)
 
-      if (!down && last) launch(nextPull)
+      if (!down && last) {
+        dragOriginWorld.current = null
+        launch(nextPull)
+      }
     },
     {
       enabled: !disabled && phase === 'ready',
