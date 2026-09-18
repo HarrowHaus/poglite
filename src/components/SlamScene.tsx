@@ -259,6 +259,7 @@ function Playfield({
         name="slammer"
         ref={slammerBody}
         colliders="hull"
+        mass={family.physics.mass}
         friction={tuning.slammerFriction}
         restitution={tuning.slammerRestitution}
         linearDamping={0.22}
