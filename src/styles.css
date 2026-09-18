@@ -1,0 +1,120 @@
+:root {
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #f3efe6;
+  background: #090807;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+* { box-sizing: border-box; }
+html, body, #root { margin: 0; min-width: 320px; min-height: 100%; }
+body { min-height: 100vh; background: radial-gradient(circle at 50% 0%, #242019 0%, #090807 48%); }
+button, input { font: inherit; }
+button { color: inherit; }
+
+.game-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: auto minmax(420px, 1fr) auto;
+  padding: clamp(12px, 2vw, 24px);
+  gap: 12px;
+  max-width: 1080px;
+  margin: 0 auto;
+}
+.combat-hud, .player-hud, .lab-header, .math-card, .rarity-summary {
+  border: 1px solid rgba(255,255,255,.1);
+  background: rgba(16,14,12,.84);
+  box-shadow: 0 18px 60px rgba(0,0,0,.28);
+}
+.combat-hud {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 24px;
+  padding: 16px 18px;
+  align-items: end;
+}
+h1, h2, p { margin-top: 0; }
+h1 { margin-bottom: 8px; font-size: clamp(24px, 4vw, 44px); letter-spacing: -.04em; }
+h2 { margin-bottom: 4px; }
+.eyebrow, .rarity { text-transform: uppercase; letter-spacing: .16em; font-weight: 900; font-size: 11px; }
+.eyebrow { color: #aaa196; margin-bottom: 4px; }
+.hud-number { margin: 5px 0 0; font: 700 11px/1 ui-monospace, monospace; color: #bbb1a4; }
+.meter { height: 8px; width: min(420px, 70vw); background: #2d2823; overflow: hidden; border-radius: 99px; }
+.meter span { display: block; height: 100%; background: #e8e15e; transition: width .25s ease; }
+.intent { text-align: center; border: 1px solid #453d34; padding: 10px 15px; min-width: 88px; }
+.intent span, .intent small { display: block; font-size: 9px; letter-spacing: .14em; color: #a59c90; }
+.intent strong { display: block; font-size: 28px; line-height: 1.05; }
+
+.table-stage, .lab-canvas {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.08);
+  background: #11100f;
+  min-height: 440px;
+}
+.table-stage canvas, .lab-canvas canvas { position: absolute !important; inset: 0; }
+.slam-instruction {
+  position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%);
+  font: 800 10px/1 ui-monospace, monospace; letter-spacing: .12em;
+  color: #d7cebf; background: rgba(0,0,0,.55); padding: 8px 10px;
+  pointer-events: none; white-space: nowrap;
+}
+.player-hud { padding: 14px 16px; display: grid; gap: 12px; grid-template-columns: 1.5fr 1fr; }
+.slammer-card small { display: block; color: #b8afa2; margin-top: 4px; }
+.rarity.common { color: #bdb7af; }
+.rarity.rare { color: #54a7ff; }
+.rarity.unique { color: #c97bff; }
+.rarity.legendary { color: #ffd65e; }
+.player-status { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.player-status div { border-left: 1px solid #3a342e; padding-left: 10px; }
+.player-status span { display: block; font-size: 9px; color: #978f86; letter-spacing: .12em; }
+.player-status strong { display: block; font-size: 24px; }
+.resolution-strip {
+  grid-column: 1 / -1; display: flex; justify-content: space-between; gap: 12px;
+  border-top: 1px solid #2f2a25; padding-top: 10px;
+  font: 800 11px/1 ui-monospace, monospace;
+}
+.reset-button {
+  grid-column: 1 / -1; border: 0; background: #f3ff72; color: #111;
+  padding: 12px 16px; font-weight: 1000; letter-spacing: .08em; cursor: pointer;
+}
+
+.lab-page { padding: clamp(16px, 3vw, 32px); max-width: 1320px; margin: 0 auto; }
+.lab-header {
+  padding: 18px; display: flex; justify-content: space-between; gap: 24px;
+  align-items: end; margin-bottom: 16px;
+}
+.lab-header.compact { margin: 0; }
+.lab-header p { margin-bottom: 0; color: #b7afa4; max-width: 650px; }
+.lab-controls { display: flex; gap: 16px; flex-wrap: wrap; }
+.lab-controls label, .lab-header label { display: grid; gap: 5px; color: #c6beb3; font-size: 12px; }
+.lab-controls input { background: #191612; color: white; border: 1px solid #3b342c; padding: 8px; }
+.rarity-summary { display: grid; grid-template-columns: repeat(4, 1fr); margin-bottom: 16px; }
+.rarity-summary div { padding: 14px; border-right: 1px solid #2d2925; }
+.rarity-summary strong { display: block; font-size: 28px; }
+.loot-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+.loot-card { padding: 12px; min-height: 132px; border: 1px solid #2b2723; background: #11100e; }
+.loot-card strong, .loot-card small { display: block; }
+.loot-card small { margin-top: 6px; color: #aaa095; }
+
+.combat-lab-grid { display: grid; grid-template-columns: minmax(280px, 1fr) minmax(280px, .7fr); gap: 16px; }
+.pog-picker { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.pog-picker button { text-align: left; background: #12100e; border: 1px solid #322c26; padding: 12px; cursor: pointer; }
+.pog-picker button.active { border-color: #f3ff72; background: #1e2014; }
+.pog-picker span { display: block; color: #9d958b; margin-top: 4px; font-size: 12px; }
+.math-card { padding: 18px; align-self: start; }
+.math-card dl { margin: 16px 0 0; }
+.math-card dl div { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #2d2925; }
+.math-card dt, .math-card dd { margin: 0; }
+.math-card .total { font-size: 20px; color: #f3ff72; }
+
+.slam-lab { height: 100vh; display: grid; grid-template-rows: auto 1fr; padding: 12px; gap: 12px; }
+.flip-readout { font: 700 11px/1.4 ui-monospace, monospace; color: #a9f0dd; max-width: 420px; }
+
+@media (max-width: 680px) {
+  .game-shell { padding: 8px; grid-template-rows: auto minmax(420px, 1fr) auto; }
+  .player-hud { grid-template-columns: 1fr; }
+  .resolution-strip, .reset-button { grid-column: auto; }
+  .combat-lab-grid { grid-template-columns: 1fr; }
+  .lab-header { align-items: stretch; flex-direction: column; }
+  .rarity-summary { grid-template-columns: repeat(2, 1fr); }
+}
