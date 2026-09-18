@@ -22,4 +22,6 @@ jobs:
       - name: Run controlled headless physics report
         env:
           POG_PHYSICS_REPORT: "1"
-        run: npx vitest run src/physics/physicsMatrix.report.test.ts --reporter=verbose
+        run: |
+          npx vitest run src/physics/physicsMatrix.report.test.ts --reporter=verbose
+          npx vitest run src/physics/physicsSearch.report.test.ts --reporter=verbose
