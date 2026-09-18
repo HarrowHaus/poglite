@@ -1,0 +1,12 @@
+import { GameShell } from './components/GameShell'
+import { CombatLab } from './dev/CombatLab'
+import { LootLab } from './dev/LootLab'
+import { SlamLab } from './dev/SlamLab'
+
+export function App() {
+  const path = window.location.pathname
+  if (path === '/dev/loot') return <LootLab />
+  if (path === '/dev/combat') return <CombatLab />
+  if (path === '/dev/slam') return <SlamLab />
+  return <GameShell />
+}
