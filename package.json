@@ -13,8 +13,8 @@
   "dependencies": {
     "@react-three/fiber": "^9.0.0",
     "@react-three/rapier": "^2.0.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
+    "react": ">=19.0.0 <19.3.0",
+    "react-dom": ">=19.0.0 <19.3.0",
     "three": "^0.180.0",
     "zod": "^4.0.0",
     "zustand": "^5.0.0"
