@@ -1,6 +1,6 @@
 import { useDrag } from '@use-gesture/react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { Physics, RigidBody, type RapierRigidBody } from '@react-three/rapier'
+import { CylinderCollider, Physics, RigidBody, type RapierRigidBody } from '@react-three/rapier'
 import {
   useEffect,
   useMemo,
@@ -115,14 +115,17 @@ function PogDisc({
     <RigidBody
       name={'pog:' + id}
       ref={bodyRef}
-      colliders="hull"
-      friction={tuning.pogFriction}
-      restitution={tuning.pogRestitution}
+      colliders={false}
       linearDamping={tuning.pogLinearDamping}
       angularDamping={tuning.pogAngularDamping}
       position={[0, 0.04 + index * spacing, 0]}
       rotation={[Math.PI, 0, index * 0.09]}
     >
+      <CylinderCollider
+        args={[POG_THICKNESS / 2, POG_RADIUS]}
+        friction={tuning.pogFriction}
+        restitution={tuning.pogRestitution}
+      />
       <mesh castShadow receiveShadow>
         <cylinderGeometry args={[POG_RADIUS, POG_RADIUS, POG_THICKNESS, 40]} />
         <meshStandardMaterial
@@ -438,10 +441,7 @@ function Playfield({
       <RigidBody
         name="slammer"
         ref={slammerBody}
-        colliders="hull"
-        mass={family.physics.mass}
-        friction={tuning.slammerFriction}
-        restitution={tuning.slammerRestitution}
+        colliders={false}
         linearDamping={0.22}
         angularDamping={0.18}
         position={[slammerAnchor.x, slammerAnchor.y, slammerAnchor.z]}
@@ -465,6 +465,12 @@ function Playfield({
           emitFeedback({ type: 'slam:impact', strength })
         }}
       >
+        <CylinderCollider
+          args={[family.physics.thickness / 2, family.physics.radius]}
+          mass={family.physics.mass}
+          friction={tuning.slammerFriction}
+          restitution={tuning.slammerRestitution}
+        />
         <group {...bind()} scale={phase === 'ready' ? 1.05 : 1}>
           <mesh castShadow>
             <cylinderGeometry
