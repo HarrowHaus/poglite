@@ -39,6 +39,8 @@ export interface JoltShotInput {
   tableRestitution?: number
   slammerFriction?: number
   slammerRestitution?: number
+  capConvexRadiusM?: number
+  slammerConvexRadiusM?: number
 }
 
 export interface JoltShotMetrics {
