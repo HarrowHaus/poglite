@@ -1,0 +1,27 @@
+name: POG Cannon Bakeoff
+
+on:
+  push:
+    branches:
+      - experiment/cannon-bakeoff-01
+    paths:
+      - "src/physics/cannonPog.ts"
+      - "src/physics/realScalePog.ts"
+      - "src/physics/cannonBakeoff.report.test.ts"
+      - "package.json"
+      - ".github/workflows/cannon-bakeoff.yml"
+  workflow_dispatch:
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - name: Run Rapier vs Cannon bakeoff
+        env:
+          POG_CANNON_BAKEOFF: "1"
+        run: npx vitest run src/physics/cannonBakeoff.report.test.ts --reporter=verbose
