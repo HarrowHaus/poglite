@@ -34,6 +34,7 @@
     "vitest": "^3.0.0",
     "fast-check": "^4.10.1",
     "@playwright/test": "^1.63.0",
-    "@types/node": "^24.0.0"
+    "@types/node": "^24.0.0",
+    "jolt-physics": "1.1.0"
   }
 }
