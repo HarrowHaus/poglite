@@ -159,8 +159,10 @@ function makeBody(
 
   Jolt.destroy(pos)
   Jolt.destroy(rot)
-  Jolt.destroy(shape)
 
+  // BodyCreationSettings takes a reference to ref-counted shapes.
+  // Do not Jolt.destroy(shape) here; CreateBody will transfer the
+  // retained shape reference from settings to the body.
   if (options.massKg !== undefined) {
     settings.mOverrideMassProperties =
       Jolt.EOverrideMassProperties_CalculateInertia
@@ -214,10 +216,18 @@ export async function simulateJoltShot(
   const bodies: any[] = []
   const caps: any[] = []
 
+  const tableHalfExtents = new Jolt.Vec3(0.15, 0.0035, 0.15)
+  const tableShape = new Jolt.BoxShape(
+    tableHalfExtents,
+    0.0005,
+    null,
+  )
+  Jolt.destroy(tableHalfExtents)
+
   const table = makeBody(
     Jolt,
     bodyInterface,
-    new Jolt.BoxShape(new Jolt.Vec3(0.15, 0.0035, 0.15), 0.0005, null),
+    tableShape,
     [0, -0.0035, 0],
     [0, 0, 0, 1],
     Jolt.EMotionType_Static,
