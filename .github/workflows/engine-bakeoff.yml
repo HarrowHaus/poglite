@@ -23,4 +23,6 @@ jobs:
       - name: Run Rapier vs Jolt real-scale bake-off
         env:
           POG_ENGINE_BAKEOFF: "1"
-        run: npx vitest run src/physics/engineBakeoff.report.test.ts --reporter=verbose
+        run: |
+          npx vitest run src/physics/engineBakeoff.report.test.ts --reporter=verbose
+          npx vitest run src/physics/joltEnvelope.report.test.ts --reporter=verbose
