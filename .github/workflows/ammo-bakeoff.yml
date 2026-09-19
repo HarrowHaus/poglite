@@ -7,6 +7,7 @@ on:
     paths:
       - "src/physics/ammoPog.ts"
       - "src/physics/ammoBakeoff.report.test.ts"
+      - "src/physics/ammoEnvelope.report.test.ts"
       - "src/physics/realScalePog.ts"
       - ".github/workflows/ammo-bakeoff.yml"
   workflow_dispatch:
@@ -23,4 +24,6 @@ jobs:
       - name: Run Rapier vs Bullet Ammo real-scale bake-off
         env:
           POG_ENGINE_BAKEOFF: "1"
-        run: |\n          npx vitest run src/physics/ammoBakeoff.report.test.ts --reporter=verbose\n          npx vitest run src/physics/ammoEnvelope.report.test.ts --reporter=verbose
+        run: |
+          npx vitest run src/physics/ammoBakeoff.report.test.ts --reporter=verbose
+          npx vitest run src/physics/ammoEnvelope.report.test.ts --reporter=verbose
