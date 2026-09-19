@@ -384,8 +384,9 @@ export async function simulateJoltShot(
 
     if (firstImpactMs !== null && elapsedMs - firstImpactMs > 500) {
       for (const cap of caps) {
-        cap.SetLinearDamping(0.45)
-        cap.SetAngularDamping(0.6)
+        const motion = cap.GetMotionProperties()
+        motion.SetLinearDamping(0.45)
+        motion.SetAngularDamping(0.6)
       }
     }
 
