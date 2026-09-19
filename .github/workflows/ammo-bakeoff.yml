@@ -23,4 +23,4 @@ jobs:
       - name: Run Rapier vs Bullet Ammo real-scale bake-off
         env:
           POG_ENGINE_BAKEOFF: "1"
-        run: npx vitest run src/physics/ammoBakeoff.report.test.ts --reporter=verbose
+        run: |\n          npx vitest run src/physics/ammoBakeoff.report.test.ts --reporter=verbose\n          npx vitest run src/physics/ammoEnvelope.report.test.ts --reporter=verbose
