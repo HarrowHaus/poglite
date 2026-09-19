@@ -226,8 +226,15 @@ export async function simulateJoltShot(
   const capRestitution = input.capRestitution ?? 0.08
   const slammerRestitution = input.slammerRestitution ?? 0.18
 
-  const tableSize = new Jolt.Vec3(15, 0.35, 15)
-  const tableShape = new Jolt.BoxShape(tableSize, 0.02, null)
+  const tableSize = new Jolt.Vec3(
+    15 * METERS_PER_CM,
+    0.35 * METERS_PER_CM,
+    15 * METERS_PER_CM,
+  )
+  const tableShape = new Jolt.BoxShape(
+    tableSize,
+    0.02 * METERS_PER_CM,
+  )
   Jolt.destroy(tableSize)
 
   const table = addBody(
@@ -248,7 +255,7 @@ export async function simulateJoltShot(
   const capShape = new Jolt.CylinderShape(
     POG_THICKNESS / 2,
     POG_RADIUS,
-    0.005,
+    0.005 * METERS_PER_CM,
   )
 
   const seed = input.seed ?? 'jolt'
@@ -286,11 +293,13 @@ export async function simulateJoltShot(
   }
 
   const slammerThickness =
-    input.slammerThicknessCm ?? DEFAULT_SLAMMER_THICKNESS
+    input.slammerThicknessCm === undefined
+      ? DEFAULT_SLAMMER_THICKNESS
+      : input.slammerThicknessCm * METERS_PER_CM
   const slammerShape = new Jolt.CylinderShape(
     slammerThickness / 2,
     POG_RADIUS,
-    0.01,
+    0.01 * METERS_PER_CM,
   )
   const rotation = slammerQuat(
     Jolt,
