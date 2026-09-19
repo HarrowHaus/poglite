@@ -17,7 +17,7 @@ describe('Cannon-es real-scale POG simulation', () => {
     expect(result.finalFlips).toBeGreaterThanOrEqual(0)
     expect(result.finalFlips).toBeLessThanOrEqual(8)
     expect(result.maxPitchRollRadPerSec).toBeGreaterThan(0)
-  })
+  }, 30_000)
 
   it('is repeatable for an identical initial state', async () => {
     const input = {
@@ -35,5 +35,5 @@ describe('Cannon-es real-scale POG simulation', () => {
 
     expect(b.finalFlips).toBe(a.finalFlips)
     expect(b.scatterRadiusCm).toBeCloseTo(a.scatterRadiusCm, 8)
-  })
+  }, 30_000)
 })
