@@ -126,6 +126,20 @@ function setupWorld(Jolt: any) {
   Jolt.destroy(settings)
 
   const physicsSystem = jolt.GetPhysicsSystem()
+
+  // Jolt's default contact distances are tuned for ~meter-scale dynamic
+  // bodies. A POG is ~1.19 mm thick, so the stock 20 mm speculative/slop
+  // distances smear the entire stack into an oversized contact envelope.
+  const physicsSettings = new Jolt.PhysicsSettings()
+  physicsSettings.mSpeculativeContactDistance = 0.00035
+  physicsSettings.mPenetrationSlop = 0.00008
+  physicsSettings.mManifoldTolerance = 0.00005
+  physicsSettings.mMaxPenetrationDistance = 0.002
+  physicsSettings.mBodyPairCacheMaxDeltaPositionSq = 0.00005 * 0.00005
+  physicsSettings.mPointVelocitySleepThreshold = 0.006
+  physicsSystem.SetPhysicsSettings(physicsSettings)
+  Jolt.destroy(physicsSettings)
+
   const gravity = new Jolt.Vec3(0, GRAVITY, 0)
   physicsSystem.SetGravity(gravity)
   Jolt.destroy(gravity)
