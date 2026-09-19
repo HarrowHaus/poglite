@@ -166,7 +166,7 @@ export async function simulateCannonShot(
     POG_RADIUS,
     POG_RADIUS,
     POG_THICKNESS,
-    48,
+    24,
   )
 
   const caps: Body[] = []
@@ -207,7 +207,7 @@ export async function simulateCannonShot(
     POG_RADIUS,
     POG_RADIUS,
     slammerThickness,
-    48,
+    24,
   )
 
   const tilt = (input.tiltDeg * Math.PI) / 180
