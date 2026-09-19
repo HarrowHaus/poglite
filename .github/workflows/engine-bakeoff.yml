@@ -1,0 +1,27 @@
+name: POG Engine Bakeoff
+
+on:
+  push:
+    branches:
+      - experiment/jolt-bakeoff-01
+    paths:
+      - "src/physics/joltPog.ts"
+      - "src/physics/realScalePog.ts"
+      - "src/physics/engineBakeoff.report.test.ts"
+      - "package.json"
+      - ".github/workflows/engine-bakeoff.yml"
+  workflow_dispatch:
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - name: Run Rapier vs Jolt bakeoff
+        env:
+          POG_ENGINE_BAKEOFF: "1"
+        run: npx vitest run src/physics/engineBakeoff.report.test.ts --reporter=verbose
