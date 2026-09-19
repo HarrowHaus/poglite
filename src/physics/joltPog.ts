@@ -2,23 +2,25 @@ import initJolt from 'jolt-physics'
 import { seededRng } from '../game/rng'
 import { isFaceUpRotation } from '../game/slamPhysics'
 
-const POG_RADIUS = 2.06375
-const POG_THICKNESS = 0.1190625
+const METERS_PER_CM = 0.01
+const CM_PER_METER = 100
+const POG_RADIUS = 2.06375 * METERS_PER_CM
+const POG_THICKNESS = 0.1190625 * METERS_PER_CM
 const POG_COUNT = 8
-const STACK_GAP = 0.008
+const STACK_GAP = 0.008 * METERS_PER_CM
 const STACK_SPACING = POG_THICKNESS + STACK_GAP
-const TABLE_Y = -0.35
-const STACK_BASE_Y = POG_THICKNESS / 2 + 0.002
+const TABLE_Y = -0.35 * METERS_PER_CM
+const STACK_BASE_Y = POG_THICKNESS / 2 + 0.002 * METERS_PER_CM
 const STACK_TOP_Y =
   STACK_BASE_Y +
   (POG_COUNT - 1) * STACK_SPACING +
   POG_THICKNESS / 2
 
-const DEFAULT_SLAMMER_THICKNESS = 0.9525
+const DEFAULT_SLAMMER_THICKNESS = 0.9525 * METERS_PER_CM
 const FACE_UP_THRESHOLD = 0.72
 const TIMESTEP = 1 / 240
 const MAX_SECONDS = 1.25
-const GRAVITY = -981
+const GRAVITY = -9.81
 
 let joltModulePromise: ReturnType<typeof initJolt> | null = null
 
@@ -68,8 +70,8 @@ export interface JoltShotMetrics {
 function offset(index: number, seed: string) {
   const rng = seededRng(seed + ':' + index)
   return {
-    x: (rng.next() - 0.5) * 0.04,
-    z: (rng.next() - 0.5) * 0.04,
+    x: (rng.next() - 0.5) * 0.04 * METERS_PER_CM,
+    z: (rng.next() - 0.5) * 0.04 * METERS_PER_CM,
   }
 }
 
@@ -247,7 +249,6 @@ export async function simulateJoltShot(
     POG_THICKNESS / 2,
     POG_RADIUS,
     0.005,
-    null,
   )
 
   const seed = input.seed ?? 'jolt'
@@ -290,7 +291,6 @@ export async function simulateJoltShot(
     slammerThickness / 2,
     POG_RADIUS,
     0.01,
-    null,
   )
   const rotation = slammerQuat(
     Jolt,
@@ -303,7 +303,7 @@ export async function simulateJoltShot(
     bodyInterface,
     LAYER,
     slammerShape,
-    { x: 0, y: STACK_TOP_Y + 7.5, z: 0 },
+    { x: 0, y: STACK_TOP_Y + 7.5 * METERS_PER_CM, z: 0 },
     {
       x: rotation.GetX(),
       y: rotation.GetY(),
@@ -329,14 +329,14 @@ export async function simulateJoltShot(
     -0.75,
     Math.min(0.75, input.lateralFraction),
   )
-  const speedCmPerSec = input.speedMps * 100
+  const speedMetersPerSec = input.speedMps
   const verticalFraction = Math.sqrt(
     Math.max(0.001, 1 - lateralFraction * lateralFraction),
   )
 
   const linearVelocity = new Jolt.Vec3(
-    lateralFraction * speedCmPerSec,
-    -verticalFraction * speedCmPerSec,
+    lateralFraction * speedMetersPerSec,
+    -verticalFraction * speedMetersPerSec,
     0,
   )
   slammer.SetLinearVelocity(linearVelocity)
@@ -361,7 +361,7 @@ export async function simulateJoltShot(
       const slammerPos = slammer.GetPosition()
       if (slammerPos.GetY() <= STACK_TOP_Y + slammerThickness) {
         const movingCaps = caps.some(
-          (cap) => vectorLength(cap.GetLinearVelocity()) > 5,
+          (cap) => vectorLength(cap.GetLinearVelocity()) > 0.05,
         )
         if (movingCaps) firstImpactMs = elapsedMs
       }
@@ -375,7 +375,10 @@ export async function simulateJoltShot(
 
       peakPitchRoll[index] = Math.max(peakPitchRoll[index], pr)
       maxPitchRollRadPerSec = Math.max(maxPitchRollRadPerSec, pr)
-      maxRise[index] = Math.max(maxRise[index], p.GetY() - startY[index])
+      maxRise[index] = Math.max(
+        maxRise[index],
+        (p.GetY() - startY[index]) * CM_PER_METER,
+      )
 
       if (isFaceUpRotation(quatLike(cap.GetRotation()), FACE_UP_THRESHOLD)) {
         everFaceUp[index] = true
@@ -393,7 +396,7 @@ export async function simulateJoltShot(
     if (firstImpactMs !== null && elapsedMs - firstImpactMs > 250) {
       const stable = caps.every(
         (cap) =>
-          vectorLength(cap.GetLinearVelocity()) < 8 &&
+          vectorLength(cap.GetLinearVelocity()) < 0.08 &&
           vectorLength(cap.GetAngularVelocity()) < 2,
       )
 
@@ -412,7 +415,7 @@ export async function simulateJoltShot(
   const scatterRadiusCm = Math.max(
     ...caps.map((cap) => {
       const p = cap.GetPosition()
-      return Math.hypot(p.GetX(), p.GetZ())
+      return Math.hypot(p.GetX(), p.GetZ()) * CM_PER_METER
     }),
   )
 
