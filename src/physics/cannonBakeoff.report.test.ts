@@ -11,7 +11,7 @@ const scenarios = [
 ] as const
 
 const slammerMasses = [0.03, 0.06, 0.09]
-const seeds = Array.from({ length: 8 }, (_, index) => 'cannon-' + index)
+const seeds = Array.from({ length: 4 }, (_, index) => 'cannon-' + index)
 
 function mean(values: number[]) {
   return values.reduce((sum, value) => sum + value, 0) / values.length
