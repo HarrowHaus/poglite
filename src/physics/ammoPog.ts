@@ -39,6 +39,9 @@ export interface AmmoShotInput {
   tableRestitution?: number
   slammerFriction?: number
   slammerRestitution?: number
+  capMarginM?: number
+  tableMarginM?: number
+  slammerMarginM?: number
 }
 
 export interface AmmoShotMetrics {
@@ -151,9 +154,10 @@ export async function simulateAmmoShot(
   const handles: BodyHandle[] = []
   const caps: BodyHandle[] = []
 
-  const tableShape = new Ammo.btBoxShape(
-    new Ammo.btVector3(0.15, 0.0035, 0.15),
-  )
+  const tableHalfExtents = new Ammo.btVector3(0.15, 0.0035, 0.15)
+  const tableShape = new Ammo.btBoxShape(tableHalfExtents)
+  Ammo.destroy(tableHalfExtents)
+  tableShape.setMargin(input.tableMarginM ?? 0.0005)
   const table = makeRigidBody(
     Ammo,
     world,
@@ -180,13 +184,14 @@ export async function simulateAmmoShot(
     const y = STACK_BASE_Y_M + index * STACK_SPACING_M
     startY.push(y)
 
-    const shape = new Ammo.btCylinderShape(
-      new Ammo.btVector3(
-        POG_RADIUS_M,
-        POG_THICKNESS_M / 2,
-        POG_RADIUS_M,
-      ),
+    const capHalfExtents = new Ammo.btVector3(
+      POG_RADIUS_M,
+      POG_THICKNESS_M / 2,
+      POG_RADIUS_M,
     )
+    const shape = new Ammo.btCylinderShape(capHalfExtents)
+    Ammo.destroy(capHalfExtents)
+    shape.setMargin(input.capMarginM ?? 0.00005)
 
     const cap = makeRigidBody(
       Ammo,
@@ -211,13 +216,14 @@ export async function simulateAmmoShot(
   const slammerThickness =
     input.slammerThicknessM ?? DEFAULT_SLAMMER_THICKNESS_M
 
-  const slammerShape = new Ammo.btCylinderShape(
-    new Ammo.btVector3(
-      SLAMMER_RADIUS_M,
-      slammerThickness / 2,
-      SLAMMER_RADIUS_M,
-    ),
+  const slammerHalfExtents = new Ammo.btVector3(
+    SLAMMER_RADIUS_M,
+    slammerThickness / 2,
+    SLAMMER_RADIUS_M,
   )
+  const slammerShape = new Ammo.btCylinderShape(slammerHalfExtents)
+  Ammo.destroy(slammerHalfExtents)
+  slammerShape.setMargin(input.slammerMarginM ?? 0.0002)
 
   const slammer = makeRigidBody(
     Ammo,
