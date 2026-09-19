@@ -242,7 +242,6 @@ export async function simulateJoltShot(
     },
   )
   bodies.push(table)
-  tableShape.Release()
 
   const capShape = new Jolt.CylinderShape(
     POG_THICKNESS / 2,
@@ -284,7 +283,6 @@ export async function simulateJoltShot(
     caps.push(cap)
     bodies.push(cap)
   }
-  capShape.Release()
 
   const slammerThickness =
     input.slammerThicknessCm ?? DEFAULT_SLAMMER_THICKNESS
@@ -326,7 +324,6 @@ export async function simulateJoltShot(
   )
   Jolt.destroy(rotation)
   bodies.push(slammer)
-  slammerShape.Release()
 
   const lateralFraction = Math.max(
     -0.75,
